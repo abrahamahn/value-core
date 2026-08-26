@@ -1,0 +1,22 @@
+[package]
+name = "value-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Domain-neutral value accounting, transfer, hold, reversal, and reconciliation primitives."
+license = "MIT"
+repository = "https://github.com/abrahamahn/value-core"
+readme = "README.md"
+keywords = ["ledger", "accounting", "value", "transactions", "reconciliation"]
+categories = ["data-structures"]
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "deny"
+pedantic = "deny"

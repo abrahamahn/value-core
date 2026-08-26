@@ -1,0 +1,9 @@
+.DS_Store
+.idea/
+.vscode/
+typescript/dist/
+typescript/node_modules/
+typescript/coverage/
+typescript/*.tgz
+rust/target/
+rust/*.crate

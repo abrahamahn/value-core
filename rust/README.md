@@ -1,0 +1,27 @@
+# value-core
+
+The Rust implementation of [`value-core`](https://github.com/abrahamahn/value-core#readme):
+domain-neutral exact amounts, balanced postings, atomic detached balance application, holds,
+reversals, idempotency, statements, conversion plans, and reconciliation. It performs no
+infrastructure I/O and depends only on `serde` and `serde_json` for canonical structured evidence.
+
+```rust
+use value_core::transaction::{CanonicalPosting, validate_balanced_transaction};
+
+validate_balanced_transaction(&[
+    CanonicalPosting {
+        account_id: "source".into(),
+        asset: "credits".into(),
+        amount_minor: "-10".into(),
+    },
+    CanonicalPosting {
+        account_id: "destination".into(),
+        asset: "credits".into(),
+        amount_minor: "10".into(),
+    },
+])?;
+```
+
+Run `cargo build --all-targets`, `cargo check --all-targets`,
+`cargo clippy --all-targets -- -D warnings`, and `cargo test` from this directory. Applications
+retain responsibility for authorization, IDs, clocks, durable atomic persistence, and adapters.
