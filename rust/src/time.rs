@@ -10,7 +10,28 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     era * 146_097 + day_of_era - 719_468
 }
 
-pub(crate) fn parse_rfc3339_millis(value: &str, context: &str) -> ValueResult<i64> {
+fn is_leap_year(year: i64) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+fn days_in_month(year: i64, month: i64) -> Option<i64> {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => Some(31),
+        4 | 6 | 9 | 11 => Some(30),
+        2 if is_leap_year(year) => Some(29),
+        2 => Some(28),
+        _ => None,
+    }
+}
+
+/// Parses an RFC 3339 instant into Unix epoch milliseconds.
+///
+/// `context` is included in validation errors so adapters can identify the rejected field.
+///
+/// # Errors
+/// Returns [`ValueError`] when the instant is malformed, names an impossible calendar date, or
+/// falls outside the supported millisecond range.
+pub fn parse_rfc3339_millis(value: &str, context: &str) -> ValueResult<i64> {
     let bytes = value.as_bytes();
     if bytes.len() < 20
         || bytes.get(4) != Some(&b'-')
@@ -42,8 +63,7 @@ pub(crate) fn parse_rfc3339_millis(value: &str, context: &str) -> ValueResult<i6
             "{context} must be an RFC 3339 instant"
         )));
     };
-    if !(1..=12).contains(&month)
-        || !(1..=31).contains(&day)
+    if days_in_month(year, month).is_none_or(|maximum| !(1..=maximum).contains(&day))
         || hour > 23
         || minute > 59
         || second > 59
@@ -113,7 +133,9 @@ fn civil_from_days(days: i64) -> (i64, i64, i64) {
     (year, month, day)
 }
 
-pub(crate) fn format_rfc3339_millis(millis: i64) -> String {
+/// Formats Unix epoch milliseconds as a canonical UTC RFC 3339 instant.
+#[must_use]
+pub fn format_rfc3339_millis(millis: i64) -> String {
     let seconds = millis.div_euclid(1_000);
     let fraction = millis.rem_euclid(1_000);
     let days = seconds.div_euclid(86_400);

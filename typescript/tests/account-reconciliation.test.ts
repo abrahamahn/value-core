@@ -31,6 +31,9 @@ describe('account history and reconciliation', () => {
         ],
       }),
     ).toThrow('gap or duplicate');
+    expect(() =>
+      foldAccountHistory({ openingBalanceMinor: '-1', postings: [] }),
+    ).toThrow('opening balance cannot be negative');
   });
 
   it('reports exact deterministic reconciliation differences', () => {

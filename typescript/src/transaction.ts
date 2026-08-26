@@ -130,7 +130,10 @@ export function applyBalancedTransaction(input: {
     if (balance.accountId.trim().length === 0 || balance.asset.trim().length === 0) {
       throw new Error('Account balance identity and asset are required');
     }
-    parseAmountMinor(balance.balanceMinor);
+    const openingBalance = parseAmountMinor(balance.balanceMinor);
+    if (openingBalance < 0n && balance.allowNegative !== true) {
+      throw new Error(`Account ${balance.accountId} cannot start with negative value`);
+    }
     balances.set(balance.accountId, balance);
   }
 

@@ -22,6 +22,15 @@ function requireIdentity(value: string, field: string): void {
   if (value.trim().length === 0) throw new Error(`${field} is required`);
 }
 
+function validateHold(hold: ValueHold): bigint {
+  requireIdentity(hold.holdId, 'Hold identity');
+  requireIdentity(hold.accountId, 'Hold account');
+  requireIdentity(hold.asset, 'Hold asset');
+  const amount = parseAmountMinor(hold.amountMinor);
+  if (amount <= 0n) throw new Error('Hold amount must be positive');
+  return amount;
+}
+
 export function createValueHold(input: {
   readonly holdId: string;
   readonly accountId: string;
@@ -47,6 +56,7 @@ export function createValueHold(input: {
 
 export function releaseValueHold(hold: ValueHold): ValueHold {
   if (hold.state !== 'open') throw new Error('Only an open hold can be released');
+  validateHold(hold);
   return Object.freeze({ ...hold, state: 'released' });
 }
 
@@ -56,11 +66,11 @@ export function settleValueHold(input: {
   readonly amountMinor?: string;
 }): HoldSettlement {
   if (input.hold.state !== 'open') throw new Error('Only an open hold can be settled');
+  const held = validateHold(input.hold);
   requireIdentity(input.destinationAccountId, 'Hold settlement destination account');
   if (input.destinationAccountId === input.hold.accountId) {
     throw new Error('Hold settlement requires a distinct destination account');
   }
-  const held = parseAmountMinor(input.hold.amountMinor);
   const settled = parseAmountMinor(input.amountMinor ?? input.hold.amountMinor);
   if (settled <= 0n || settled > held) {
     throw new Error('Hold settlement amount must be positive and cannot exceed the hold');

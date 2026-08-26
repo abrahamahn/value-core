@@ -25,6 +25,7 @@ The supported public surface covers:
 - deterministic account reconciliation differences;
 - paged account statements with sequence and balance continuity;
 - deterministic cross-asset conversion plans represented as independently balanced transactions;
+- strict RFC 3339 calendar validation and canonical UTC formatting in the Rust API;
 - canonical JSON and domain-separated SHA-256 evidence.
 
 ## What this library is not
@@ -45,6 +46,7 @@ and returns deterministic domain values that an application adapter can commit.
 - Balance application validates the complete posting set before returning any new balances.
 - Accounts are non-negative by default; negative balances require an explicit account policy.
 - Hold amounts are positive, cannot exceed available value, and follow `open → released|settled`.
+- Conversion source and destination amounts are positive and must match the pinned rational rate.
 - Reversals are exact sign inversions of an already balanced posting set.
 - Reusing a command ID with changed contract version or payload is rejected.
 - Account histories and statements are gap-free and balance-continuous.
@@ -133,6 +135,11 @@ transaction, postings, balances, and outbox facts through an application-owned r
 Manifest digests support an explicit domain/version profile so an application can preserve an
 existing digest contract without placing product terminology in this library. Storage adapters can
 map the public account, posting, statement, and reconciliation values to any persistence system.
+
+The TypeScript conversion surface uses explicit input and result interfaces; arbitrary quote
+payloads remain usable through the generic replay contract as long as they carry a `quoteId`. The
+Rust `time` module exposes strict RFC 3339 parsing and canonical formatting for adapters that need
+the same timestamp semantics as statements and quote expiry checks.
 
 The two language implementations intentionally expose ecosystem-idiomatic names while protecting
 the same domain invariants. They do not call each other and can be installed independently.

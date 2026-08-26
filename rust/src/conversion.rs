@@ -96,7 +96,7 @@ pub fn build_value_conversion_plan(
     }
     let source_amount_minor = positive_amount(source_amount_minor, "sourceAmountMinor")?;
     let destination_amount_minor =
-        non_negative_amount(destination_amount_minor, "destinationAmountMinor")?;
+        positive_amount(destination_amount_minor, "destinationAmountMinor")?;
     let rate_numerator = positive_amount(rate_numerator, "rateNumerator")?;
     let rate_denominator = positive_amount(rate_denominator, "rateDenominator")?;
     if rounding != "floor" {
@@ -350,10 +350,9 @@ pub fn plan_value_conversion_correction(
         &original.rate_snapshot_id,
         "Value conversion rateSnapshotId is required",
     )?;
-    let source_amount_minor =
-        non_negative_amount(&original.source_amount_minor, "sourceAmountMinor")?;
+    let source_amount_minor = positive_amount(&original.source_amount_minor, "sourceAmountMinor")?;
     let destination_amount_minor =
-        non_negative_amount(&original.destination_amount_minor, "destinationAmountMinor")?;
+        positive_amount(&original.destination_amount_minor, "destinationAmountMinor")?;
     Ok(ConversionCorrection {
         correction_kind: "literal_reversal".into(),
         source_asset: original.source_asset,

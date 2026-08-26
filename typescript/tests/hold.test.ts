@@ -48,5 +48,14 @@ describe('value holds', () => {
       }),
     );
     expect(() => releaseValueHold(released)).toThrow('Only an open hold');
+    expect(() =>
+      releaseValueHold({
+        holdId: 'forged',
+        accountId: 'buyer',
+        asset: 'credits',
+        amountMinor: '0',
+        state: 'open',
+      }),
+    ).toThrow('must be positive');
   });
 });

@@ -6,6 +6,10 @@ balanced postings, atomic detached balance application, holds, reversals, idempo
 conversion plans, and reconciliation. It has no runtime dependencies and no infrastructure or
 product assumptions.
 
+Public conversion inputs and results use explicit interfaces. Quote replay is generic over an
+application's quote payload and requires only a stable `quoteId`; storage and authorization remain
+application responsibilities.
+
 ```ts
 import { validateBalancedTransaction } from '@abrahamahn/value-core';
 

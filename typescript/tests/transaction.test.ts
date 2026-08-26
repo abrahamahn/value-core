@@ -50,6 +50,21 @@ describe('balanced value transactions', () => {
     ).toThrow('insufficient value');
   });
 
+  it('rejects an invalid negative opening balance even when postings would heal it', () => {
+    expect(() =>
+      applyBalancedTransaction({
+        balances: [
+          { accountId: 'source', asset: 'credits', balanceMinor: '-5' },
+          { accountId: 'destination', asset: 'credits', balanceMinor: '10' },
+        ],
+        postings: [
+          { accountId: 'source', asset: 'credits', amountMinor: '5' },
+          { accountId: 'destination', asset: 'credits', amountMinor: '-5' },
+        ],
+      }),
+    ).toThrow('cannot start with negative value');
+  });
+
   it('conserves each asset independently in a multi-posting transaction', () => {
     expect(
       validateBalancedTransaction([
@@ -82,5 +97,23 @@ describe('balanced value transactions', () => {
         digest,
       }),
     ).resolves.toMatchObject({ digest });
+  });
+
+  it('rejects incomplete and tampered posting manifests', async () => {
+    const digest = await createPostingManifestDigest(transfer);
+    await expect(
+      validatePostingManifest({ declaredCount: 2, postings: transfer, closed: false, digest }),
+    ).rejects.toThrow('closed before commit');
+    await expect(
+      validatePostingManifest({ declaredCount: 3, postings: transfer, closed: true, digest }),
+    ).rejects.toThrow('count does not match');
+    await expect(
+      validatePostingManifest({
+        declaredCount: 2,
+        postings: transfer,
+        closed: true,
+        digest: '0'.repeat(64),
+      }),
+    ).rejects.toThrow('digest mismatch');
   });
 });

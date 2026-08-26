@@ -92,7 +92,13 @@ pub fn apply_balanced_transaction(
             &balance.asset,
             "Account balance identity and asset are required",
         )?;
-        parse_amount_minor(&balance.balance_minor)?;
+        let opening_balance = parse_amount_minor(&balance.balance_minor)?;
+        if opening_balance < 0 && !balance.allow_negative {
+            return Err(ValueError::new(format!(
+                "Account {} cannot start with negative value",
+                balance.account_id
+            )));
+        }
         if indexed
             .insert(balance.account_id.as_str(), balance)
             .is_some()

@@ -11,7 +11,7 @@ pub mod hold;
 pub mod idempotency;
 pub mod reconciliation;
 pub mod statement;
-mod time;
+pub mod time;
 pub mod transaction;
 
 use std::fmt;

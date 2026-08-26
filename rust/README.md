@@ -4,6 +4,8 @@ The Rust implementation of [`value-core`](https://github.com/abrahamahn/value-co
 domain-neutral exact amounts, balanced postings, atomic detached balance application, holds,
 reversals, idempotency, statements, conversion plans, and reconciliation. It performs no
 infrastructure I/O and depends only on `serde` and `serde_json` for canonical structured evidence.
+The public `time` module provides strict RFC 3339 parsing and canonical UTC formatting without
+introducing a clock dependency.
 
 ```rust
 use value_core::transaction::{CanonicalPosting, validate_balanced_transaction};

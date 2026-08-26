@@ -18,6 +18,17 @@ pub struct ValueHold {
     pub state: HoldState,
 }
 
+fn validate_hold(hold: &ValueHold) -> ValueResult<i64> {
+    required(&hold.hold_id, "Hold identity is required")?;
+    required(&hold.account_id, "Hold account is required")?;
+    required(&hold.asset, "Hold asset is required")?;
+    let amount = parse_amount_minor(&hold.amount_minor)?;
+    if amount <= 0 {
+        return Err(ValueError::new("Hold amount must be positive"));
+    }
+    Ok(amount)
+}
+
 /// # Errors
 /// Returns [`ValueError`] when a hold is malformed or exceeds available value.
 pub fn create_value_hold(
@@ -53,6 +64,7 @@ pub fn release_value_hold(hold: &ValueHold) -> ValueResult<ValueHold> {
     if hold.state != HoldState::Open {
         return Err(ValueError::new("Only an open hold can be released"));
     }
+    validate_hold(hold)?;
     let mut released = hold.clone();
     released.state = HoldState::Released;
     Ok(released)
@@ -76,6 +88,7 @@ pub fn settle_value_hold(
     if hold.state != HoldState::Open {
         return Err(ValueError::new("Only an open hold can be settled"));
     }
+    let held_amount = validate_hold(hold)?;
     required(
         destination_account_id,
         "Hold settlement destination account is required",
@@ -85,7 +98,6 @@ pub fn settle_value_hold(
             "Hold settlement requires a distinct destination account",
         ));
     }
-    let held_amount = parse_amount_minor(&hold.amount_minor)?;
     let settled = parse_amount_minor(amount_minor.unwrap_or(&hold.amount_minor))?;
     if settled <= 0 || settled > held_amount {
         return Err(ValueError::new(

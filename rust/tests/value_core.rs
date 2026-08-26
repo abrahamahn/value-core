@@ -3,7 +3,11 @@ use value_core::account::{AccountHistoryPosting, fold_account_history};
 use value_core::amount::{
     ArithmeticOperation, evaluate_value_arithmetic, multiply_rational_floor, parse_amount_minor,
 };
-use value_core::conversion::build_value_conversion_plan;
+use value_core::canonical::{canonical_json, domain_separated_digest};
+use value_core::conversion::{
+    OriginalConversion, build_value_conversion_plan, plan_value_conversion_correction,
+    validate_value_conversion_quote,
+};
 use value_core::hold::{HoldState, create_value_hold, release_value_hold, settle_value_hold};
 use value_core::idempotency::{ValueCommand, resolve_value_command_replay};
 use value_core::reconciliation::{ReconciliationBalance, reconcile_balances};
@@ -79,6 +83,39 @@ fn transfers_apply_atomically_and_reject_insufficient_value() {
             .message()
             .contains("insufficient value")
     );
+
+    let invalid_opening = vec![
+        AccountBalance {
+            account_id: "source".into(),
+            asset: "credits".into(),
+            balance_minor: "-5".into(),
+            allow_negative: false,
+        },
+        AccountBalance {
+            account_id: "destination".into(),
+            asset: "credits".into(),
+            balance_minor: "10".into(),
+            allow_negative: false,
+        },
+    ];
+    let healing_postings = vec![
+        CanonicalPosting {
+            account_id: "source".into(),
+            asset: "credits".into(),
+            amount_minor: "5".into(),
+        },
+        CanonicalPosting {
+            account_id: "destination".into(),
+            asset: "credits".into(),
+            amount_minor: "-5".into(),
+        },
+    ];
+    assert!(
+        apply_balanced_transaction(&invalid_opening, &healing_postings)
+            .unwrap_err()
+            .message()
+            .contains("cannot start with negative value")
+    );
 }
 
 #[test]
@@ -96,6 +133,24 @@ fn conservation_reversal_and_manifest_are_exact() {
     );
     let digest = create_posting_manifest_digest(&postings).unwrap();
     assert!(validate_posting_manifest(2, &postings, true, &digest).is_ok());
+    assert!(
+        validate_posting_manifest(2, &postings, false, &digest)
+            .unwrap_err()
+            .message()
+            .contains("closed before commit")
+    );
+    assert!(
+        validate_posting_manifest(3, &postings, true, &digest)
+            .unwrap_err()
+            .message()
+            .contains("count does not match")
+    );
+    assert!(
+        validate_posting_manifest(2, &postings, true, &"0".repeat(64))
+            .unwrap_err()
+            .message()
+            .contains("digest mismatch")
+    );
 
     let mut unbalanced = postings;
     unbalanced[1].amount_minor = "24".into();
@@ -112,6 +167,11 @@ fn holds_enforce_available_value_and_lifecycle() {
     assert!(create_value_hold("hold-2", "buyer", "credits", "101", "100").is_err());
     let released = release_value_hold(&hold).unwrap();
     assert!(release_value_hold(&released).is_err());
+    let forged = value_core::hold::ValueHold {
+        amount_minor: "0".into(),
+        ..hold
+    };
+    assert!(release_value_hold(&forged).is_err());
 }
 
 #[test]
@@ -151,6 +211,7 @@ fn account_history_and_reconciliation_expose_exact_differences() {
         .final_balance_minor,
         "15"
     );
+    assert!(fold_account_history("-1", &[], false).is_err());
     let result = reconcile_balances(
         &[ReconciliationBalance {
             account_id: "a".into(),
@@ -175,6 +236,50 @@ fn conversion_and_statement_facts_remain_balanced_and_continuous() {
     )
     .unwrap();
     assert_eq!(plan.transactions.len(), 2);
+    assert_eq!(plan.transactions[0].postings[0].amount_minor, "-10");
+    assert_eq!(plan.transactions[1].postings[1].amount_minor, "25");
+    assert!(
+        build_value_conversion_plan(
+            "quote-small",
+            "credits",
+            "points",
+            "1",
+            "0",
+            "1",
+            "2",
+            "floor",
+        )
+        .unwrap_err()
+        .message()
+        .contains("destinationAmountMinor must be positive")
+    );
+    assert!(
+        validate_value_conversion_quote(
+            "quote-date",
+            "actor-1",
+            "actor-1",
+            "rate-1",
+            "rate-1",
+            "2026-02-01T00:00:00.000Z",
+            "2026-02-31T00:00:00.000Z",
+        )
+        .unwrap_err()
+        .message()
+        .contains("RFC 3339 instant")
+    );
+    assert!(
+        plan_value_conversion_correction(
+            "literal_reversal",
+            OriginalConversion {
+                source_asset: "credits".into(),
+                source_amount_minor: "1".into(),
+                destination_asset: "points".into(),
+                destination_amount_minor: "0".into(),
+                rate_snapshot_id: "rate-1".into(),
+            },
+        )
+        .is_err()
+    );
 
     let statement = build_value_statement_page(
         "account-1",
@@ -201,4 +306,17 @@ fn conversion_and_statement_facts_remain_balanced_and_continuous() {
     )
     .unwrap();
     assert_eq!(statement.closing_balance_minor, "15");
+}
+
+#[test]
+fn canonical_evidence_matches_the_cross_language_golden_vector() {
+    let value = json!({"z": [3, {"b": true, "a": "x"}], "": 2, "😀": 1});
+    assert_eq!(
+        canonical_json(&value).unwrap(),
+        "{\"z\":[3,{\"a\":\"x\",\"b\":true}],\"😀\":1,\"\":2}"
+    );
+    assert_eq!(
+        domain_separated_digest("value-core/test", "v1", &value).unwrap(),
+        "d422be436e96980b0c5d83b09c9e6049d4a1834c16e68fe874bf57b9b7b5de62"
+    );
 }
