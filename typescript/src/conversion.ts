@@ -1,5 +1,6 @@
 import { parseAmountMinor } from './amount.js';
 import { canonicalJson } from './canonical.js';
+import { parseRfc3339Millis } from './time.js';
 
 type DataRecord = Readonly<Record<string, unknown>>;
 
@@ -149,44 +150,6 @@ function requirePositiveAmount(record: DataRecord, key: string): bigint {
   return parsed;
 }
 
-function parseInstant(value: string, name: string): number {
-  const match =
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|([+-])(\d{2}):(\d{2}))$/u.exec(
-      value,
-    );
-  if (match === null) {
-    throw new Error(`Value conversion ${name} must be an RFC 3339 instant`);
-  }
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const hour = Number(match[4]);
-  const minute = Number(match[5]);
-  const second = Number(match[6]);
-  const offsetHour = match[8] === undefined ? 0 : Number(match[8]);
-  const offsetMinute = match[9] === undefined ? 0 : Number(match[9]);
-  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-  const daysInMonth = [0, 31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  if (
-    month < 1 ||
-    month > 12 ||
-    day < 1 ||
-    day > (daysInMonth[month] ?? 0) ||
-    hour > 23 ||
-    minute > 59 ||
-    second > 59 ||
-    offsetHour > 23 ||
-    offsetMinute > 59
-  ) {
-    throw new Error(`Value conversion ${name} must be an RFC 3339 instant`);
-  }
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`Value conversion ${name} must be an RFC 3339 instant`);
-  }
-  return parsed;
-}
-
 function balancedTransaction(asset: string, amountMinor: bigint): ValueConversionTransaction {
   return Object.freeze({
     asset,
@@ -253,8 +216,14 @@ export function validateValueConversionQuote(
   if (requireString(inputRecord, 'rateSnapshotId') !== requireString(quote, 'rateSnapshotId')) {
     throw new Error('Value conversion rate snapshot changed');
   }
-  const evaluatedAt = parseInstant(requireString(inputRecord, 'evaluatedAt'), 'evaluatedAt');
-  const expiresAt = parseInstant(requireString(quote, 'expiresAt'), 'expiresAt');
+  const evaluatedAt = parseRfc3339Millis(
+    requireString(inputRecord, 'evaluatedAt'),
+    'Value conversion evaluatedAt',
+  );
+  const expiresAt = parseRfc3339Millis(
+    requireString(quote, 'expiresAt'),
+    'Value conversion expiresAt',
+  );
   if (evaluatedAt >= expiresAt) throw new Error('Value conversion quote has expired');
   return Object.freeze({ status: 'valid', quoteId });
 }

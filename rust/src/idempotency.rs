@@ -20,6 +20,32 @@ fn validate_command(command: &ValueCommand) -> ValueResult<()> {
     )
 }
 
+/// Project a command payload onto caller-selected semantic fields.
+#[must_use]
+pub fn project_value_command_payload(value: &Value, excluded_keys: &[&str]) -> Value {
+    match value {
+        Value::Array(items) => Value::Array(
+            items
+                .iter()
+                .map(|item| project_value_command_payload(item, excluded_keys))
+                .collect(),
+        ),
+        Value::Object(object) => Value::Object(
+            object
+                .iter()
+                .filter(|(key, _)| !excluded_keys.contains(&key.as_str()))
+                .map(|(key, item)| {
+                    (
+                        key.clone(),
+                        project_value_command_payload(item, excluded_keys),
+                    )
+                })
+                .collect(),
+        ),
+        _ => value.clone(),
+    }
+}
+
 /// # Errors
 /// Returns [`ValueError`] when the command cannot be canonicalized.
 pub fn create_value_command_digest(command: &ValueCommand) -> ValueResult<String> {

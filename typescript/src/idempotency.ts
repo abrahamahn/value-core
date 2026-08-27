@@ -11,6 +11,37 @@ export interface CommandReplay {
   readonly digest: string;
 }
 
+/**
+ * Project a command payload onto its semantic fields. Consumers own the exclusion policy; the
+ * core only applies it recursively and rejects data that cannot be canonicalized safely.
+ */
+export function projectValueCommandPayload(
+  value: unknown,
+  excludedKeys: ReadonlySet<string> | readonly string[],
+  ancestors = new WeakSet<object>(),
+): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (ancestors.has(value)) throw new Error('Value command payload cannot contain a cycle');
+  const prototype = Object.getPrototypeOf(value) as object | null;
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Value command payload accepts only plain data objects');
+  }
+  const excluded = excludedKeys instanceof Set ? excludedKeys : new Set(excludedKeys);
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      return value.map((item) => projectValueCommandPayload(item, excluded, ancestors));
+    }
+    return Object.fromEntries(
+      Object.entries(value as Readonly<Record<string, unknown>>)
+        .filter(([key]) => !excluded.has(key))
+        .map(([key, item]) => [key, projectValueCommandPayload(item, excluded, ancestors)]),
+    );
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
 function validateCommand(command: ValueCommand): void {
   if (command.commandId.trim().length === 0) throw new Error('Value command identity is required');
   if (command.contractVersion.trim().length === 0) {

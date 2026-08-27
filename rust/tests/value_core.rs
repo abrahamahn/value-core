@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde_json::json;
 use value_core::account::{AccountHistoryPosting, fold_account_history};
 use value_core::amount::{
@@ -8,8 +10,15 @@ use value_core::conversion::{
     OriginalConversion, build_value_conversion_plan, plan_value_conversion_correction,
     validate_value_conversion_quote,
 };
+use value_core::fact::{OrderedValueFact, order_value_facts, validate_pinned_digest_references};
 use value_core::hold::{HoldState, create_value_hold, release_value_hold, settle_value_hold};
-use value_core::idempotency::{ValueCommand, resolve_value_command_replay};
+use value_core::idempotency::{
+    ValueCommand, project_value_command_payload, resolve_value_command_replay,
+};
+use value_core::rate::{
+    ValueRateFreshness, ValueRateSnapshotInput, create_value_rate_snapshot,
+    evaluate_value_rate_freshness, multiply_rational_half_even,
+};
 use value_core::reconciliation::{ReconciliationBalance, reconcile_balances};
 use value_core::statement::{StatementPosting, build_value_statement_page};
 use value_core::transaction::{
@@ -192,6 +201,93 @@ fn duplicate_commands_require_identical_semantic_intent() {
         ..existing.clone()
     };
     assert!(resolve_value_command_replay(&existing, &incoming).is_err());
+    assert_eq!(
+        project_value_command_payload(
+            &json!({
+                "amountMinor": "7",
+                "presentation": {"label": "new"},
+                "nested": {"traceId": "trace-1", "stable": true}
+            }),
+            &["presentation", "traceId"],
+        ),
+        json!({"amountMinor": "7", "nested": {"stable": true}})
+    );
+}
+
+#[test]
+fn rates_round_and_expire_deterministically() {
+    assert_eq!(
+        multiply_rational_half_even("1", "1", "2")
+            .unwrap()
+            .amount_minor,
+        "0"
+    );
+    assert_eq!(
+        multiply_rational_half_even("3", "1", "2")
+            .unwrap()
+            .amount_minor,
+        "2"
+    );
+    assert_eq!(
+        multiply_rational_half_even("5", "1", "2")
+            .unwrap()
+            .amount_minor,
+        "2"
+    );
+    let snapshot = create_value_rate_snapshot(ValueRateSnapshotInput {
+        snapshot_id: "rate-1".into(),
+        base_asset: "credits".into(),
+        quote_asset: "points".into(),
+        numerator: "5".into(),
+        denominator: "2".into(),
+        observed_at: "2026-01-01T00:00:00.000Z".into(),
+        recorded_at: "2026-01-01T00:00:01.000Z".into(),
+        effective_at: "2026-01-01T00:00:02.000Z".into(),
+        max_staleness_seconds: 60,
+    })
+    .unwrap();
+    assert_eq!(snapshot.expires_at, "2026-01-01T00:01:02.000Z");
+    assert!(matches!(
+        evaluate_value_rate_freshness(
+            "rate-1",
+            "2026-01-01T00:00:00.000Z",
+            "2026-01-01T00:01:00.000Z",
+            60,
+        )
+        .unwrap(),
+        ValueRateFreshness::Stale { .. }
+    ));
+}
+
+#[test]
+fn facts_are_gap_free_and_pin_caller_selected_artifacts() {
+    let ordered = order_value_facts(&[
+        OrderedValueFact {
+            id: "fact-2".into(),
+            sequence: 2,
+            occurred_at: "2026-01-01T00:00:01.000Z".into(),
+        },
+        OrderedValueFact {
+            id: "fact-1".into(),
+            sequence: 1,
+            occurred_at: "2026-01-01T00:00:00.000Z".into(),
+        },
+    ])
+    .unwrap();
+    assert_eq!(ordered[0].id, "fact-1");
+    let digest = "a".repeat(64);
+    assert!(
+        validate_pinned_digest_references(
+            &digest,
+            &["command".into(), "receipt".into()],
+            &BTreeMap::from([
+                ("command".into(), digest.clone()),
+                ("receipt".into(), digest.clone()),
+            ]),
+        )
+        .unwrap()
+        .consistent
+    );
 }
 
 #[test]

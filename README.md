@@ -20,12 +20,14 @@ The supported public surface covers:
 - atomic application of posting sets to detached account balances;
 - exact literal transaction reversals;
 - holds, release, full or partial settlement, and settlement posting plans;
-- semantic command digests and duplicate-command conflict detection;
+- semantic command digests, caller-configurable payload projection, and duplicate conflicts;
 - gap-free account-history folding and balance continuity;
+- deterministic gap-free value fact ordering and pinned-digest reference validation;
 - deterministic account reconciliation differences;
 - paged account statements with sequence and balance continuity;
 - deterministic cross-asset conversion plans represented as independently balanced transactions;
-- strict RFC 3339 calendar validation and canonical UTC formatting in the Rust API;
+- exact half-even rational rates with generic snapshots and freshness evaluation;
+- strict RFC 3339 calendar validation and canonical UTC formatting in both APIs;
 - canonical JSON and domain-separated SHA-256 evidence.
 
 ## What this library is not
@@ -49,7 +51,9 @@ and returns deterministic domain values that an application adapter can commit.
 - Conversion source and destination amounts are positive and must match the pinned rational rate.
 - Reversals are exact sign inversions of an already balanced posting set.
 - Reusing a command ID with changed contract version or payload is rejected.
+- Rate snapshots use positive rational terms, ordered timestamps, and deterministic expiry.
 - Account histories and statements are gap-free and balance-continuous.
+- Ordered value facts are identity-bearing, timestamp-valid, and gap-free.
 - Reconciliation emits exact, deterministically ordered differences.
 
 These are in-process guarantees. An adapter must persist a validated transaction, account updates,

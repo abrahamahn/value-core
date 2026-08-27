@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Add caller-configurable semantic command payload projection without embedding application field
+  policy in the core.
+- Add exact half-even rational rate arithmetic and generic rate snapshot/freshness primitives.
+- Add deterministic, gap-free value fact ordering and configurable pinned-digest validation.
+- Expose strict RFC 3339 parsing and canonical UTC formatting in TypeScript as well as Rust.
+- Preserve cross-language behavior for the extracted command, rate, time, and fact invariants.
+
 ## 0.2.0
 
 - Replace the TypeScript conversion catch-all record API with explicit input and result contracts.

@@ -1,6 +1,6 @@
 {
   "name": "@abrahamahn/value-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Domain-neutral value accounting, transfer, hold, reversal, and reconciliation primitives.",
   "type": "module",
   "sideEffects": false,
