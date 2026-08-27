@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::amount::parse_amount_minor;
-use crate::time::{format_rfc3339_millis, parse_rfc3339_millis};
+use crate::time::{format_rfc3339_millis, parse_rfc3339_millis, try_format_rfc3339_millis};
 use crate::{ValueError, ValueResult, required};
 
 pub const MAX_STATEMENT_PAGE_SIZE: usize = 500;
@@ -11,10 +11,21 @@ pub fn canonical_statement_timestamp(millis: i64) -> String {
     format_rfc3339_millis(millis)
 }
 
+/// Produces a canonical statement timestamp only within the shared TypeScript/Rust calendar range.
+///
+/// # Errors
+/// Returns [`ValueError`] when the instant cannot be represented with a four-digit RFC 3339 year.
+pub fn try_canonical_statement_timestamp(millis: i64) -> ValueResult<String> {
+    try_format_rfc3339_millis(millis, "Value statement timestamp")
+}
+
 /// # Errors
 /// Returns an error when the timestamp is not an RFC 3339 instant.
 pub fn normalize_statement_timestamp(value: &str) -> ValueResult<String> {
-    parse_rfc3339_millis(value, "Value statement timestamp").map(format_rfc3339_millis)
+    try_format_rfc3339_millis(
+        parse_rfc3339_millis(value, "Value statement timestamp")?,
+        "Value statement timestamp",
+    )
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -103,7 +114,9 @@ pub fn build_value_statement_page(
         ] {
             let parsed = parse_rfc3339_millis(timestamp, field)
                 .map_err(|_| ValueError::new(format!("{field} must be a canonical timestamp")))?;
-            if format_rfc3339_millis(parsed) != *timestamp {
+            let canonical = try_format_rfc3339_millis(parsed, field)
+                .map_err(|_| ValueError::new(format!("{field} must be a canonical timestamp")))?;
+            if canonical != *timestamp {
                 return Err(ValueError::new(format!(
                     "{field} must be a canonical timestamp"
                 )));

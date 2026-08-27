@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2
+
+- Execute the shared Hold/idempotency/reconciliation lifecycle corpus in both TypeScript and Rust.
+- Add checked Rust RFC 3339 formatting and reject non-canonical four-digit-year rate/statement output.
+- Align Rust safe-integer bounds with TypeScript for rate intervals and ordered fact sequences.
+- Add direct Rust coverage for the remaining public conversion, transaction-profile, time, and statement
+  primitives.
+
 ## 0.3.1
 
 - Replace the handwritten Rust SHA-256 implementation with the audited `sha2` crate.

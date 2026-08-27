@@ -3,6 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::time::parse_rfc3339_millis;
 use crate::{ValueError, ValueResult, is_lower_sha256, required};
 
+const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OrderedValueFact {
     pub id: String,
@@ -17,9 +19,9 @@ pub struct OrderedValueFact {
 pub fn order_value_facts(facts: &[OrderedValueFact]) -> ValueResult<Vec<OrderedValueFact>> {
     for fact in facts {
         required(&fact.id, "Value fact identity is required")?;
-        if fact.sequence == 0 {
+        if !(1..=MAX_SAFE_INTEGER).contains(&fact.sequence) {
             return Err(ValueError::new(
-                "Value fact sequence must be a positive integer",
+                "Value fact sequence must be a positive safe integer",
             ));
         }
         parse_rfc3339_millis(&fact.occurred_at, "Value fact timestamp")?;
