@@ -152,7 +152,8 @@ pub fn apply_balanced_transaction(
 /// Creates a literal inverse of a balanced transaction.
 ///
 /// # Errors
-/// Returns [`ValueError`] when the original transaction is invalid.
+/// Returns [`ValueError`] when the original transaction is invalid or any inverted amount would
+/// fall outside the signed 64-bit range.
 pub fn create_transaction_reversal(
     postings: &[CanonicalPosting],
 ) -> ValueResult<Vec<CanonicalPosting>> {

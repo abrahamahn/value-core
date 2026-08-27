@@ -7,7 +7,9 @@ infrastructure I/O and uses `serde`/`serde_json` for structured evidence plus th
 implementation for domain-separated hashes.
 The public rate and fact modules provide half-even rational rates, deterministic freshness,
 gap-free ordering, and pinned-digest validation. The public `time` module provides strict RFC 3339
-parsing and canonical UTC formatting without introducing a clock dependency.
+parsing and checked canonical UTC formatting without introducing a clock dependency. Use
+`try_format_rfc3339_millis` at protocol and persistence boundaries so output stays within the
+four-digit-year range shared with TypeScript.
 
 ```rust
 use value_core::transaction::{CanonicalPosting, validate_balanced_transaction};

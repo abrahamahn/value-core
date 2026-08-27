@@ -1,5 +1,8 @@
 use crate::{ValueError, ValueResult};
 
+const MIN_CANONICAL_RFC3339_MILLIS: i64 = -62_167_219_200_000;
+const MAX_CANONICAL_RFC3339_MILLIS: i64 = 253_402_300_799_999;
+
 fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let adjusted_year = year - i64::from(month <= 2);
     let era = adjusted_year.div_euclid(400);
@@ -145,4 +148,18 @@ pub fn format_rfc3339_millis(millis: i64) -> String {
     let minute = (seconds_of_day % 3_600) / 60;
     let second = seconds_of_day % 60;
     format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{fraction:03}Z")
+}
+
+/// Formats Unix epoch milliseconds as a canonical four-digit-year UTC RFC 3339 instant.
+///
+/// # Errors
+/// Returns [`ValueError`] when the instant falls outside `0000-01-01T00:00:00.000Z` through
+/// `9999-12-31T23:59:59.999Z`, matching the TypeScript implementation's canonical output range.
+pub fn try_format_rfc3339_millis(millis: i64, context: &str) -> ValueResult<String> {
+    if !(MIN_CANONICAL_RFC3339_MILLIS..=MAX_CANONICAL_RFC3339_MILLIS).contains(&millis) {
+        return Err(ValueError::new(format!(
+            "{context} is outside the supported RFC 3339 calendar range"
+        )));
+    }
+    Ok(format_rfc3339_millis(millis))
 }

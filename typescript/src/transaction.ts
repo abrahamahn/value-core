@@ -188,7 +188,10 @@ export function applyBalancedTransaction(input: {
   );
 }
 
-/** Creates the literal inverse of a balanced transaction without changing its asset or accounts. */
+/**
+ * Creates the literal inverse of a balanced transaction without changing its asset or accounts.
+ * Rejects an inverted amount that cannot remain within the signed 64-bit range.
+ */
 export function createTransactionReversal(
   postings: readonly CanonicalPostingInput[],
 ): readonly CanonicalPostingInput[] {

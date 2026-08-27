@@ -99,6 +99,24 @@ describe("balanced value transactions", () => {
     ).resolves.toMatchObject({ digest });
   });
 
+  it("rejects a reversal whose literal inverse exceeds the amount range", () => {
+    expect(() =>
+      createTransactionReversal([
+        {
+          accountId: "minimum",
+          asset: "credits",
+          amountMinor: "-9223372036854775808",
+        },
+        {
+          accountId: "maximum",
+          asset: "credits",
+          amountMinor: "9223372036854775807",
+        },
+        { accountId: "remainder", asset: "credits", amountMinor: "1" },
+      ]),
+    ).toThrow("supported signed range");
+  });
+
   it("rejects incomplete and tampered posting manifests", async () => {
     const digest = await createPostingManifestDigest(transfer);
     await expect(

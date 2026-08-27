@@ -28,7 +28,7 @@ The supported public surface covers:
 - deterministic cross-asset conversion plans represented as independently balanced transactions;
 - exact half-even rational rates with generic snapshots and freshness evaluation;
 - strict RFC 3339 calendar validation and canonical UTC formatting in both APIs;
-- canonical JSON and domain-separated SHA-256 evidence.
+- canonical JSON and domain-separated SHA-256 evidence;
 - one versioned canonicalization corpus executed by both TypeScript and Rust.
 
 ## What this library is not
@@ -50,7 +50,8 @@ and returns deterministic domain values that an application adapter can commit.
 - Accounts are non-negative by default; negative balances require an explicit account policy.
 - Hold amounts are positive, cannot exceed available value, and follow `open → released|settled`.
 - Conversion source and destination amounts are positive and must match the pinned rational rate.
-- Reversals are exact sign inversions of an already balanced posting set.
+- Reversals are exact sign inversions of an already balanced posting set and reject an inversion
+  that cannot remain within the signed 64-bit amount range.
 - Reusing a command ID with changed contract version or payload is rejected.
 - Rate snapshots use positive rational terms, ordered timestamps, and deterministic expiry.
 - Account histories and statements are gap-free and balance-continuous.
@@ -150,8 +151,10 @@ map the public account, posting, statement, and reconciliation values to any per
 
 The TypeScript conversion surface uses explicit input and result interfaces; arbitrary quote
 payloads remain usable through the generic replay contract as long as they carry a `quoteId`. The
-Rust `time` module exposes strict RFC 3339 parsing and canonical formatting for adapters that need
-the same timestamp semantics as statements and quote expiry checks.
+Rust `time` module exposes strict RFC 3339 parsing and checked canonical formatting for adapters
+that need the same timestamp semantics as statements and quote expiry checks. Use
+`try_format_rfc3339_millis` at protocol and persistence boundaries; the infallible formatter remains
+available for callers that intentionally operate outside the shared four-digit-year calendar range.
 
 The two language implementations intentionally expose ecosystem-idiomatic names while protecting
 the same domain invariants. They do not call each other and can be installed independently.

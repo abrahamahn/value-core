@@ -1,8 +1,8 @@
 use crate::amount::parse_amount_minor;
-use crate::time::{format_rfc3339_millis, parse_rfc3339_millis};
+use crate::time::{parse_rfc3339_millis, try_format_rfc3339_millis};
 use crate::{ValueError, ValueResult, required};
 
-const MAX_RFC3339_MILLIS: i64 = 8_640_000_000_000_000;
+const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RationalRateResult {
@@ -100,9 +100,9 @@ pub fn create_value_rate_snapshot(input: ValueRateSnapshotInput) -> ValueResult<
             "Value rate numerator and denominator must be positive",
         ));
     }
-    if input.max_staleness_seconds <= 0 {
+    if !(1..=MAX_SAFE_INTEGER).contains(&input.max_staleness_seconds) {
         return Err(ValueError::new(
-            "Value rate maximum staleness must be a positive integer",
+            "Value rate maximum staleness must be a positive safe integer",
         ));
     }
     let observed = parse_rfc3339_millis(&input.observed_at, "Value rate observedAt")?;
@@ -118,11 +118,6 @@ pub fn create_value_rate_snapshot(input: ValueRateSnapshotInput) -> ValueResult<
         .checked_mul(1_000)
         .and_then(|staleness| effective.checked_add(staleness))
         .ok_or_else(|| ValueError::new("Value rate expiry time is outside the supported range"))?;
-    if !(-MAX_RFC3339_MILLIS..=MAX_RFC3339_MILLIS).contains(&expires) {
-        return Err(ValueError::new(
-            "Value rate expiry time is outside the supported RFC 3339 calendar range",
-        ));
-    }
     Ok(ValueRateSnapshot {
         snapshot_id: input.snapshot_id,
         base_asset: input.base_asset,
@@ -133,7 +128,7 @@ pub fn create_value_rate_snapshot(input: ValueRateSnapshotInput) -> ValueResult<
         recorded_at: input.recorded_at,
         effective_at: input.effective_at,
         max_staleness_seconds: input.max_staleness_seconds,
-        expires_at: format_rfc3339_millis(expires),
+        expires_at: try_format_rfc3339_millis(expires, "Value rate expiresAt")?,
     })
 }
 
@@ -160,9 +155,9 @@ pub fn evaluate_value_rate_freshness(
     refresh_interval_seconds: i64,
 ) -> ValueResult<ValueRateFreshness> {
     required(snapshot_id, "Value rate snapshot identity is required")?;
-    if refresh_interval_seconds <= 0 {
+    if !(1..=MAX_SAFE_INTEGER).contains(&refresh_interval_seconds) {
         return Err(ValueError::new(
-            "Value rate refresh interval must be a positive integer",
+            "Value rate refresh interval must be a positive safe integer",
         ));
     }
     let captured = parse_rfc3339_millis(captured_at, "Value rate capturedAt")?;
