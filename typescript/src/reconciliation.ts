@@ -1,4 +1,4 @@
-import { parseAmountMinor } from './amount.js';
+import { parseAmountMinor } from "./amount.js";
 
 export interface ReconciliationBalance {
   readonly accountId: string;
@@ -24,12 +24,16 @@ function indexBalances(
 ): ReadonlyMap<string, ReconciliationBalance> {
   const indexed = new Map<string, ReconciliationBalance>();
   for (const balance of balances) {
-    if (balance.accountId.trim().length === 0 || balance.asset.trim().length === 0) {
-      throw new Error('Reconciliation account identity and asset are required');
+    if (
+      balance.accountId.trim().length === 0 ||
+      balance.asset.trim().length === 0
+    ) {
+      throw new Error("Reconciliation account identity and asset are required");
     }
     parseAmountMinor(balance.amountMinor);
     const key = `${balance.asset}\u0000${balance.accountId}`;
-    if (indexed.has(key)) throw new Error('Reconciliation balance identity is duplicated');
+    if (indexed.has(key))
+      throw new Error("Reconciliation balance identity is duplicated");
     indexed.set(key, balance);
   }
   return indexed;
@@ -48,8 +52,8 @@ export function reconcileBalances(input: {
     const actualBalance = actual.get(key);
     const identity = expectedBalance ?? actualBalance;
     if (identity === undefined) continue;
-    const expectedMinor = parseAmountMinor(expectedBalance?.amountMinor ?? '0');
-    const actualMinor = parseAmountMinor(actualBalance?.amountMinor ?? '0');
+    const expectedMinor = parseAmountMinor(expectedBalance?.amountMinor ?? "0");
+    const actualMinor = parseAmountMinor(actualBalance?.amountMinor ?? "0");
     if (expectedMinor !== actualMinor) {
       differences.push(
         Object.freeze({

@@ -1,0 +1,105 @@
+{
+  "profile": "value-core-lifecycle-v1",
+  "hold": {
+    "create": {
+      "holdId": "hold-conformance",
+      "accountId": "buyer",
+      "asset": "credits",
+      "amountMinor": "40",
+      "availableBalanceMinor": "100"
+    },
+    "open": {
+      "holdId": "hold-conformance",
+      "accountId": "buyer",
+      "asset": "credits",
+      "amountMinor": "40",
+      "state": "open"
+    },
+    "settlement": {
+      "destinationAccountId": "seller",
+      "amountMinor": "30",
+      "settledAmountMinor": "30",
+      "releasedAmountMinor": "10",
+      "state": "settled",
+      "postings": [
+        { "accountId": "buyer", "asset": "credits", "amountMinor": "-30" },
+        { "accountId": "seller", "asset": "credits", "amountMinor": "30" }
+      ]
+    },
+    "releaseState": "released",
+    "failures": [
+      { "kind": "over_available", "error": "Insufficient available value for hold" },
+      {
+        "kind": "same_destination",
+        "error": "Hold settlement requires a distinct destination account"
+      },
+      { "kind": "double_release", "error": "Only an open hold can be released" }
+    ]
+  },
+  "idempotency": {
+    "existing": {
+      "commandId": "settle-hold-conformance",
+      "contractVersion": "v1",
+      "payload": {
+        "holdId": "hold-conformance",
+        "amountMinor": "30",
+        "destinationAccountId": "seller"
+      }
+    },
+    "sameIntent": {
+      "commandId": "settle-hold-conformance",
+      "contractVersion": "v1",
+      "payload": {
+        "destinationAccountId": "seller",
+        "amountMinor": "30",
+        "holdId": "hold-conformance"
+      }
+    },
+    "changedIntent": {
+      "commandId": "settle-hold-conformance",
+      "contractVersion": "v1",
+      "payload": {
+        "holdId": "hold-conformance",
+        "amountMinor": "31",
+        "destinationAccountId": "seller"
+      }
+    },
+    "digest": "89cdbf5d777bd0b5157e13f2f253ee3e9f50ecaa98002ad051b28897e3183339"
+  },
+  "reconciliation": {
+    "expected": [
+      { "accountId": "buyer", "asset": "credits", "amountMinor": "70" },
+      { "accountId": "seller", "asset": "credits", "amountMinor": "33" },
+      { "accountId": "platform-fee", "asset": "credits", "amountMinor": "2" }
+    ],
+    "actual": [
+      { "accountId": "buyer", "asset": "credits", "amountMinor": "70" },
+      { "accountId": "seller", "asset": "credits", "amountMinor": "32" },
+      { "accountId": "external", "asset": "credits", "amountMinor": "1" }
+    ],
+    "closed": false,
+    "differences": [
+      {
+        "accountId": "external",
+        "asset": "credits",
+        "expectedMinor": "0",
+        "actualMinor": "1",
+        "differenceMinor": "1"
+      },
+      {
+        "accountId": "platform-fee",
+        "asset": "credits",
+        "expectedMinor": "2",
+        "actualMinor": "0",
+        "differenceMinor": "-2"
+      },
+      {
+        "accountId": "seller",
+        "asset": "credits",
+        "expectedMinor": "33",
+        "actualMinor": "32",
+        "differenceMinor": "-1"
+      }
+    ]
+  }
+}

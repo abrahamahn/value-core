@@ -1,11 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync } from "node:fs";
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
-import { canonicalJson, domainSeparatedDigest } from '../src/canonical.js';
+import { canonicalJson, domainSeparatedDigest } from "../src/canonical.js";
 
-describe('canonical evidence', () => {
-  it('matches every language-neutral canonical JSON and digest vector', async () => {
+describe("canonical evidence", () => {
+  it("matches every language-neutral canonical JSON and digest vector", async () => {
     interface CanonicalVector {
       readonly name: string;
       readonly domain: string;
@@ -15,24 +15,34 @@ describe('canonical evidence', () => {
       readonly digest: string;
     }
     const fixture = JSON.parse(
-      readFileSync(new URL('../../rust/fixtures/canonical-v1.json', import.meta.url), 'utf8'),
-    ) as { readonly profile: string; readonly vectors: readonly CanonicalVector[] };
+      readFileSync(
+        new URL("../../rust/fixtures/canonical-v1.json", import.meta.url),
+        "utf8",
+      ),
+    ) as {
+      readonly profile: string;
+      readonly vectors: readonly CanonicalVector[];
+    };
 
-    expect(fixture.profile).toBe('value-core-canonical-v1');
+    expect(fixture.profile).toBe("value-core-canonical-v1");
     for (const vector of fixture.vectors) {
       expect(canonicalJson(vector.value), vector.name).toBe(vector.canonical);
       await expect(
-        domainSeparatedDigest(vector.domain, vector.contractVersion, vector.value),
+        domainSeparatedDigest(
+          vector.domain,
+          vector.contractVersion,
+          vector.value,
+        ),
         vector.name,
       ).resolves.toBe(vector.digest);
     }
   });
 
-  it('rejects values that cannot have stable data semantics', () => {
-    expect(() => canonicalJson({ amount: -0 })).toThrow('negative zero');
-    expect(() => canonicalJson({ amount: 1n })).toThrow('unsupported');
+  it("rejects values that cannot have stable data semantics", () => {
+    expect(() => canonicalJson({ amount: -0 })).toThrow("negative zero");
+    expect(() => canonicalJson({ amount: 1n })).toThrow("unsupported");
     const cyclic: { self?: unknown } = {};
     cyclic.self = cyclic;
-    expect(() => canonicalJson(cyclic)).toThrow('cycle');
+    expect(() => canonicalJson(cyclic)).toThrow("cycle");
   });
 });

@@ -1,15 +1,16 @@
-import { parseAmountMinor } from './amount.js';
-import { domainSeparatedDigest } from './canonical.js';
+import { parseAmountMinor } from "./amount.js";
+import { domainSeparatedDigest } from "./canonical.js";
 
 export interface PostingManifestDigestProfile {
   readonly domain: string;
   readonly contractVersion: string;
 }
 
-export const DEFAULT_POSTING_MANIFEST_DIGEST_PROFILE: PostingManifestDigestProfile = Object.freeze({
-  domain: 'value-core/posting-manifest',
-  contractVersion: 'v1',
-});
+export const DEFAULT_POSTING_MANIFEST_DIGEST_PROFILE: PostingManifestDigestProfile =
+  Object.freeze({
+    domain: "value-core/posting-manifest",
+    contractVersion: "v1",
+  });
 
 export interface CanonicalPostingInput {
   readonly accountId: string;
@@ -25,14 +26,17 @@ export interface PostingManifestInput {
 }
 
 function assertPostingShape(posting: CanonicalPostingInput): bigint {
-  if (posting.accountId.length === 0) throw new Error('Posting account is required');
-  if (posting.asset.length === 0) throw new Error('Posting asset is required');
+  if (posting.accountId.length === 0)
+    throw new Error("Posting account is required");
+  if (posting.asset.length === 0) throw new Error("Posting asset is required");
   const amount = parseAmountMinor(posting.amountMinor);
-  if (amount === 0n) throw new Error('Canonical postings must be non-zero');
+  if (amount === 0n) throw new Error("Canonical postings must be non-zero");
   return amount;
 }
 
-function totalsByAsset(postings: readonly CanonicalPostingInput[]): ReadonlyMap<string, bigint> {
+function totalsByAsset(
+  postings: readonly CanonicalPostingInput[],
+): ReadonlyMap<string, bigint> {
   const totals = new Map<string, bigint>();
   for (const posting of postings) {
     const amount = assertPostingShape(posting);
@@ -58,14 +62,18 @@ export function createPostingManifestDigest(
   );
 }
 
-export function validateBalancedTransaction(postings: readonly CanonicalPostingInput[]): {
-  readonly totalMinor: '0';
+export function validateBalancedTransaction(
+  postings: readonly CanonicalPostingInput[],
+): {
+  readonly totalMinor: "0";
 } {
-  if (postings.length < 2) throw new Error('A balanced transaction requires at least two postings');
+  if (postings.length < 2)
+    throw new Error("A balanced transaction requires at least two postings");
   for (const [asset, total] of totalsByAsset(postings)) {
-    if (total !== 0n) throw new Error(`Posting balance for asset ${asset} is non-zero`);
+    if (total !== 0n)
+      throw new Error(`Posting balance for asset ${asset} is non-zero`);
   }
-  return { totalMinor: '0' };
+  return { totalMinor: "0" };
 }
 
 export function validateSingleAssetTransaction(input: {
@@ -77,11 +85,14 @@ export function validateSingleAssetTransaction(input: {
   readonly postings: readonly CanonicalPostingInput[];
 } {
   if (input.debitMeansIncrease === true) {
-    throw new Error('Posting sign convention is always the named account perspective');
+    throw new Error(
+      "Posting sign convention is always the named account perspective",
+    );
   }
-  if (input.asset.length === 0) throw new Error('Transaction asset is required');
+  if (input.asset.length === 0)
+    throw new Error("Transaction asset is required");
   if (input.postings.some((posting) => posting.asset !== input.asset)) {
-    throw new Error('A canonical transaction may name exactly one asset');
+    throw new Error("A canonical transaction may name exactly one asset");
   }
   validateBalancedTransaction(input.postings);
   return { asset: input.asset, postings: input.postings };
@@ -92,18 +103,24 @@ export async function validatePostingManifest(
   profile: PostingManifestDigestProfile = DEFAULT_POSTING_MANIFEST_DIGEST_PROFILE,
 ): Promise<PostingManifestInput> {
   if (!Number.isSafeInteger(input.declaredCount) || input.declaredCount < 2) {
-    throw new Error('Posting manifest must declare at least two postings');
+    throw new Error("Posting manifest must declare at least two postings");
   }
-  if (!input.closed) throw new Error('Posting manifest must be closed before commit');
+  if (!input.closed)
+    throw new Error("Posting manifest must be closed before commit");
   if (input.postings.length !== input.declaredCount) {
-    throw new Error('Posting manifest count does not match its closed posting set');
+    throw new Error(
+      "Posting manifest count does not match its closed posting set",
+    );
   }
   validateBalancedTransaction(input.postings);
   if (input.digest === undefined || !/^[0-9a-f]{64}$/u.test(input.digest)) {
-    throw new Error('Posting manifest requires a lowercase SHA-256 digest');
+    throw new Error("Posting manifest requires a lowercase SHA-256 digest");
   }
-  if (input.digest !== (await createPostingManifestDigest(input.postings, profile))) {
-    throw new Error('Posting manifest digest mismatch');
+  if (
+    input.digest !==
+    (await createPostingManifestDigest(input.postings, profile))
+  ) {
+    throw new Error("Posting manifest digest mismatch");
   }
   return input;
 }
@@ -126,13 +143,19 @@ export function applyBalancedTransaction(input: {
   validateBalancedTransaction(input.postings);
   const balances = new Map<string, AccountBalance>();
   for (const balance of input.balances) {
-    if (balances.has(balance.accountId)) throw new Error('Account balance identity is duplicated');
-    if (balance.accountId.trim().length === 0 || balance.asset.trim().length === 0) {
-      throw new Error('Account balance identity and asset are required');
+    if (balances.has(balance.accountId))
+      throw new Error("Account balance identity is duplicated");
+    if (
+      balance.accountId.trim().length === 0 ||
+      balance.asset.trim().length === 0
+    ) {
+      throw new Error("Account balance identity and asset are required");
     }
     const openingBalance = parseAmountMinor(balance.balanceMinor);
     if (openingBalance < 0n && balance.allowNegative !== true) {
-      throw new Error(`Account ${balance.accountId} cannot start with negative value`);
+      throw new Error(
+        `Account ${balance.accountId} cannot start with negative value`,
+      );
     }
     balances.set(balance.accountId, balance);
   }
@@ -143,16 +166,19 @@ export function applyBalancedTransaction(input: {
     if (balance === undefined)
       throw new Error(`Posting account ${posting.accountId} is unavailable`);
     if (balance.asset !== posting.asset)
-      throw new Error('Posting asset does not match its account');
+      throw new Error("Posting asset does not match its account");
     deltas.set(
       posting.accountId,
-      (deltas.get(posting.accountId) ?? 0n) + parseAmountMinor(posting.amountMinor),
+      (deltas.get(posting.accountId) ?? 0n) +
+        parseAmountMinor(posting.amountMinor),
     );
   }
 
   return Object.freeze(
     input.balances.map((balance) => {
-      const next = parseAmountMinor(balance.balanceMinor) + (deltas.get(balance.accountId) ?? 0n);
+      const next =
+        parseAmountMinor(balance.balanceMinor) +
+        (deltas.get(balance.accountId) ?? 0n);
       const checked = parseAmountMinor(next.toString());
       if (checked < 0n && balance.allowNegative !== true) {
         throw new Error(`Account ${balance.accountId} has insufficient value`);

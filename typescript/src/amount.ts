@@ -4,19 +4,19 @@ const MAX_AMOUNT_MINOR = (1n << 63n) - 1n;
 const MIN_AMOUNT_MINOR = -(1n << 63n);
 
 export function parseAmountMinor(value: string): bigint {
-  if (!DECIMAL_INTEGER_PATTERN.test(value) || value === '-0') {
-    throw new Error('Value amount must be a canonical decimal integer');
+  if (!DECIMAL_INTEGER_PATTERN.test(value) || value === "-0") {
+    throw new Error("Value amount must be a canonical decimal integer");
   }
   const parsed = BigInt(value);
   if (parsed < MIN_AMOUNT_MINOR || parsed > MAX_AMOUNT_MINOR) {
-    throw new Error('Value amount exceeds the supported signed range');
+    throw new Error("Value amount exceeds the supported signed range");
   }
   return parsed;
 }
 
 function checkedAmount(value: bigint): bigint {
   if (value < MIN_AMOUNT_MINOR || value > MAX_AMOUNT_MINOR) {
-    throw new Error('Value arithmetic overflow');
+    throw new Error("Value arithmetic overflow");
   }
   return value;
 }
@@ -25,7 +25,8 @@ function floorDivide(
   numerator: bigint,
   denominator: bigint,
 ): { quotient: bigint; remainder: bigint } {
-  if (denominator <= 0n) throw new Error('Rational denominator must be positive');
+  if (denominator <= 0n)
+    throw new Error("Rational denominator must be positive");
   let quotient = numerator / denominator;
   let remainder = numerator % denominator;
   if (remainder < 0n) {
@@ -36,12 +37,12 @@ function floorDivide(
 }
 
 export type ValueArithmeticInput =
-  | { readonly operation: 'add'; readonly left: string; readonly right: string }
+  | { readonly operation: "add"; readonly left: string; readonly right: string }
   | {
-      readonly operation: 'round_rational';
+      readonly operation: "round_rational";
       readonly numerator: string;
       readonly denominator: string;
-      readonly mode: 'floor';
+      readonly mode: "floor";
     };
 
 export interface ValueArithmeticResult {
@@ -49,8 +50,10 @@ export interface ValueArithmeticResult {
   readonly remainderNumerator?: string;
 }
 
-export function evaluateValueArithmetic(input: ValueArithmeticInput): ValueArithmeticResult {
-  if (input.operation === 'add') {
+export function evaluateValueArithmetic(
+  input: ValueArithmeticInput,
+): ValueArithmeticResult {
+  if (input.operation === "add") {
     return {
       amountMinor: checkedAmount(
         parseAmountMinor(input.left) + parseAmountMinor(input.right),

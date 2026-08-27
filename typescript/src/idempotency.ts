@@ -1,4 +1,4 @@
-import { domainSeparatedDigest } from './canonical.js';
+import { domainSeparatedDigest } from "./canonical.js";
 
 export interface ValueCommand<TPayload = unknown> {
   readonly commandId: string;
@@ -7,7 +7,7 @@ export interface ValueCommand<TPayload = unknown> {
 }
 
 export interface CommandReplay {
-  readonly status: 'replayed';
+  readonly status: "replayed";
   readonly digest: string;
 }
 
@@ -20,22 +20,33 @@ export function projectValueCommandPayload(
   excludedKeys: ReadonlySet<string> | readonly string[],
   ancestors = new WeakSet<object>(),
 ): unknown {
-  if (value === null || typeof value !== 'object') return value;
-  if (ancestors.has(value)) throw new Error('Value command payload cannot contain a cycle');
+  if (value === null || typeof value !== "object") return value;
+  if (ancestors.has(value))
+    throw new Error("Value command payload cannot contain a cycle");
   const prototype = Object.getPrototypeOf(value) as object | null;
-  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
-    throw new Error('Value command payload accepts only plain data objects');
+  if (
+    !Array.isArray(value) &&
+    prototype !== Object.prototype &&
+    prototype !== null
+  ) {
+    throw new Error("Value command payload accepts only plain data objects");
   }
-  const excluded = excludedKeys instanceof Set ? excludedKeys : new Set(excludedKeys);
+  const excluded =
+    excludedKeys instanceof Set ? excludedKeys : new Set(excludedKeys);
   ancestors.add(value);
   try {
     if (Array.isArray(value)) {
-      return value.map((item) => projectValueCommandPayload(item, excluded, ancestors));
+      return value.map((item) =>
+        projectValueCommandPayload(item, excluded, ancestors),
+      );
     }
     return Object.fromEntries(
       Object.entries(value as Readonly<Record<string, unknown>>)
         .filter(([key]) => !excluded.has(key))
-        .map(([key, item]) => [key, projectValueCommandPayload(item, excluded, ancestors)]),
+        .map(([key, item]) => [
+          key,
+          projectValueCommandPayload(item, excluded, ancestors),
+        ]),
     );
   } finally {
     ancestors.delete(value);
@@ -43,15 +54,18 @@ export function projectValueCommandPayload(
 }
 
 function validateCommand(command: ValueCommand): void {
-  if (command.commandId.trim().length === 0) throw new Error('Value command identity is required');
+  if (command.commandId.trim().length === 0)
+    throw new Error("Value command identity is required");
   if (command.contractVersion.trim().length === 0) {
-    throw new Error('Value command contract version is required');
+    throw new Error("Value command contract version is required");
   }
 }
 
-export function createValueCommandDigest(command: ValueCommand): Promise<string> {
+export function createValueCommandDigest(
+  command: ValueCommand,
+): Promise<string> {
   validateCommand(command);
-  return domainSeparatedDigest('value-core/command', command.contractVersion, {
+  return domainSeparatedDigest("value-core/command", command.contractVersion, {
     commandId: command.commandId,
     payload: command.payload,
   });
@@ -64,14 +78,16 @@ export async function resolveValueCommandReplay(input: {
   validateCommand(input.existing);
   validateCommand(input.incoming);
   if (input.existing.commandId !== input.incoming.commandId) {
-    throw new Error('Value command identity changed');
+    throw new Error("Value command identity changed");
   }
   const [existingDigest, incomingDigest] = await Promise.all([
     createValueCommandDigest(input.existing),
     createValueCommandDigest(input.incoming),
   ]);
   if (existingDigest !== incomingDigest) {
-    throw new Error('Value command identity was reused with changed semantic intent');
+    throw new Error(
+      "Value command identity was reused with changed semantic intent",
+    );
   }
-  return Object.freeze({ status: 'replayed', digest: existingDigest });
+  return Object.freeze({ status: "replayed", digest: existingDigest });
 }

@@ -1,6 +1,6 @@
-import { parseAmountMinor } from './amount.js';
-import { canonicalJson } from './canonical.js';
-import { parseRfc3339Millis } from './time.js';
+import { parseAmountMinor } from "./amount.js";
+import { canonicalJson } from "./canonical.js";
+import { parseRfc3339Millis } from "./time.js";
 
 type DataRecord = Readonly<Record<string, unknown>>;
 
@@ -12,7 +12,7 @@ export interface ValueConversionPlanInput {
   readonly destinationAmountMinor: string;
   readonly rateNumerator: string;
   readonly rateDenominator: string;
-  readonly rounding: 'floor';
+  readonly rounding: "floor";
 }
 
 export interface ValueConversionPosting {
@@ -44,7 +44,7 @@ export interface ValueConversionQuoteReplayInput<
 export interface ValueConversionQuoteReplay<
   TQuote extends ValueConversionQuoteIdentity = ValueConversionQuoteIdentity,
 > {
-  readonly status: 'replayed';
+  readonly status: "replayed";
   readonly quote: TQuote;
 }
 
@@ -63,7 +63,7 @@ export interface ValueConversionQuoteValidationInput {
 }
 
 export interface ValidValueConversionQuote {
-  readonly status: 'valid';
+  readonly status: "valid";
   readonly quoteId: string;
 }
 
@@ -79,18 +79,18 @@ export interface UnknownValueConversionInput {
 
 export type UnknownValueConversionResolution =
   | {
-      readonly status: 'succeeded';
+      readonly status: "succeeded";
       readonly transactionIds: readonly string[];
       readonly resubmitAllowed: false;
     }
-  | { readonly status: 'failed'; readonly resubmitAllowed: false }
-  | { readonly status: 'unknown'; readonly resubmitAllowed: false };
+  | { readonly status: "failed"; readonly resubmitAllowed: false }
+  | { readonly status: "unknown"; readonly resubmitAllowed: false };
 
 export interface ValueConversionExecutionInput {
   readonly sourceAmountMinor: string;
   readonly executedSourceMinor: string;
   readonly executedDestinationMinor: string;
-  readonly partialExecutionPolicy: 'forbidden' | 'return_unexecuted_source';
+  readonly partialExecutionPolicy: "forbidden" | "return_unexecuted_source";
 }
 
 export interface ValueConversionExecutionSettlement {
@@ -109,13 +109,13 @@ export interface OriginalValueConversion {
 
 export interface ValueConversionCorrectionInput {
   readonly original: OriginalValueConversion;
-  readonly correctionKind: 'literal_reversal';
+  readonly correctionKind: "literal_reversal";
   /** Accepted for compatibility; literal reversals intentionally ignore the active market rate. */
   readonly activeRateSnapshotId?: string;
 }
 
 export interface ValueConversionCorrection {
-  readonly correctionKind: 'literal_reversal';
+  readonly correctionKind: "literal_reversal";
   readonly sourceAsset: string;
   readonly sourceAmountMinor: string;
   readonly destinationAsset: string;
@@ -124,7 +124,7 @@ export interface ValueConversionCorrection {
 }
 
 function requireRecord(value: unknown, name: string): DataRecord {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${name} must be a data object`);
   }
   return value as DataRecord;
@@ -132,7 +132,7 @@ function requireRecord(value: unknown, name: string): DataRecord {
 
 function requireString(record: DataRecord, key: string): string {
   const value = record[key];
-  if (typeof value !== 'string' || value.trim().length === 0) {
+  if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`Value conversion ${key} is required`);
   }
   return value;
@@ -140,7 +140,8 @@ function requireString(record: DataRecord, key: string): string {
 
 function requireNonNegativeAmount(record: DataRecord, key: string): bigint {
   const parsed = parseAmountMinor(requireString(record, key));
-  if (parsed < 0n) throw new Error(`Value conversion ${key} cannot be negative`);
+  if (parsed < 0n)
+    throw new Error(`Value conversion ${key} cannot be negative`);
   return parsed;
 }
 
@@ -150,7 +151,10 @@ function requirePositiveAmount(record: DataRecord, key: string): bigint {
   return parsed;
 }
 
-function balancedTransaction(asset: string, amountMinor: bigint): ValueConversionTransaction {
+function balancedTransaction(
+  asset: string,
+  amountMinor: bigint,
+): ValueConversionTransaction {
   return Object.freeze({
     asset,
     postings: Object.freeze([
@@ -160,24 +164,35 @@ function balancedTransaction(asset: string, amountMinor: bigint): ValueConversio
   });
 }
 
-export function buildValueConversionPlan(input: ValueConversionPlanInput): ValueConversionPlan {
-  const record = requireRecord(input, 'Value conversion plan');
-  const quoteId = requireString(record, 'quoteId');
-  const sourceAsset = requireString(record, 'sourceAsset');
-  const destinationAsset = requireString(record, 'destinationAsset');
+export function buildValueConversionPlan(
+  input: ValueConversionPlanInput,
+): ValueConversionPlan {
+  const record = requireRecord(input, "Value conversion plan");
+  const quoteId = requireString(record, "quoteId");
+  const sourceAsset = requireString(record, "sourceAsset");
+  const destinationAsset = requireString(record, "destinationAsset");
   if (sourceAsset === destinationAsset) {
-    throw new Error('Value conversion requires distinct source and destination assets');
+    throw new Error(
+      "Value conversion requires distinct source and destination assets",
+    );
   }
-  const sourceAmount = requirePositiveAmount(record, 'sourceAmountMinor');
-  const destinationAmount = requirePositiveAmount(record, 'destinationAmountMinor');
-  const rateNumerator = requirePositiveAmount(record, 'rateNumerator');
-  const rateDenominator = requirePositiveAmount(record, 'rateDenominator');
-  if (requireString(record, 'rounding') !== 'floor') {
-    throw new Error('Value conversion plan requires an explicit supported rounding profile');
+  const sourceAmount = requirePositiveAmount(record, "sourceAmountMinor");
+  const destinationAmount = requirePositiveAmount(
+    record,
+    "destinationAmountMinor",
+  );
+  const rateNumerator = requirePositiveAmount(record, "rateNumerator");
+  const rateDenominator = requirePositiveAmount(record, "rateDenominator");
+  if (requireString(record, "rounding") !== "floor") {
+    throw new Error(
+      "Value conversion plan requires an explicit supported rounding profile",
+    );
   }
   const expectedDestination = (sourceAmount * rateNumerator) / rateDenominator;
   if (destinationAmount !== expectedDestination) {
-    throw new Error('Value conversion destination amount does not match its pinned rate');
+    throw new Error(
+      "Value conversion destination amount does not match its pinned rate",
+    );
   }
   return Object.freeze({
     quoteId,
@@ -188,70 +203,94 @@ export function buildValueConversionPlan(input: ValueConversionPlanInput): Value
   });
 }
 
-export function resolveValueConversionQuoteReplay<TQuote extends ValueConversionQuoteIdentity>(
+export function resolveValueConversionQuoteReplay<
+  TQuote extends ValueConversionQuoteIdentity,
+>(
   input: ValueConversionQuoteReplayInput<TQuote>,
 ): ValueConversionQuoteReplay<TQuote> {
-  const inputRecord = requireRecord(input, 'Value conversion quote replay');
-  const existing = requireRecord(inputRecord['existing'], 'Existing value conversion quote');
-  const incoming = requireRecord(inputRecord['incoming'], 'Incoming value conversion quote');
-  const existingQuoteId = requireString(existing, 'quoteId');
-  if (existingQuoteId !== requireString(incoming, 'quoteId')) {
-    throw new Error('Value conversion quote identity changed');
+  const inputRecord = requireRecord(input, "Value conversion quote replay");
+  const existing = requireRecord(
+    inputRecord["existing"],
+    "Existing value conversion quote",
+  );
+  const incoming = requireRecord(
+    inputRecord["incoming"],
+    "Incoming value conversion quote",
+  );
+  const existingQuoteId = requireString(existing, "quoteId");
+  if (existingQuoteId !== requireString(incoming, "quoteId")) {
+    throw new Error("Value conversion quote identity changed");
   }
   if (canonicalJson(existing) !== canonicalJson(incoming)) {
-    throw new Error('Value conversion quote identity was reused with changed semantic intent');
+    throw new Error(
+      "Value conversion quote identity was reused with changed semantic intent",
+    );
   }
-  return Object.freeze({ status: 'replayed', quote: input.existing });
+  return Object.freeze({ status: "replayed", quote: input.existing });
 }
 
 export function validateValueConversionQuote(
   input: ValueConversionQuoteValidationInput,
 ): ValidValueConversionQuote {
-  const inputRecord = requireRecord(input, 'Value conversion quote validation');
-  const quote = requireRecord(inputRecord['quote'], 'Value conversion quote');
-  const quoteId = requireString(quote, 'quoteId');
-  if (requireString(inputRecord, 'actorId') !== requireString(quote, 'actorId')) {
-    throw new Error('Value conversion quote is not authorized for this actor');
+  const inputRecord = requireRecord(input, "Value conversion quote validation");
+  const quote = requireRecord(inputRecord["quote"], "Value conversion quote");
+  const quoteId = requireString(quote, "quoteId");
+  if (
+    requireString(inputRecord, "actorId") !== requireString(quote, "actorId")
+  ) {
+    throw new Error("Value conversion quote is not authorized for this actor");
   }
-  if (requireString(inputRecord, 'rateSnapshotId') !== requireString(quote, 'rateSnapshotId')) {
-    throw new Error('Value conversion rate snapshot changed');
+  if (
+    requireString(inputRecord, "rateSnapshotId") !==
+    requireString(quote, "rateSnapshotId")
+  ) {
+    throw new Error("Value conversion rate snapshot changed");
   }
   const evaluatedAt = parseRfc3339Millis(
-    requireString(inputRecord, 'evaluatedAt'),
-    'Value conversion evaluatedAt',
+    requireString(inputRecord, "evaluatedAt"),
+    "Value conversion evaluatedAt",
   );
   const expiresAt = parseRfc3339Millis(
-    requireString(quote, 'expiresAt'),
-    'Value conversion expiresAt',
+    requireString(quote, "expiresAt"),
+    "Value conversion expiresAt",
   );
-  if (evaluatedAt >= expiresAt) throw new Error('Value conversion quote has expired');
-  return Object.freeze({ status: 'valid', quoteId });
+  if (evaluatedAt >= expiresAt)
+    throw new Error("Value conversion quote has expired");
+  return Object.freeze({ status: "valid", quoteId });
 }
 
 export function resolveUnknownValueConversion(
   input: UnknownValueConversionInput,
 ): UnknownValueConversionResolution {
-  const inputRecord = requireRecord(input, 'Unknown value conversion');
-  requireString(inputRecord, 'commandId');
-  const durableReceipt = inputRecord['durableReceipt'];
+  const inputRecord = requireRecord(input, "Unknown value conversion");
+  requireString(inputRecord, "commandId");
+  const durableReceipt = inputRecord["durableReceipt"];
   if (durableReceipt === null || durableReceipt === undefined) {
-    return Object.freeze({ status: 'unknown', resubmitAllowed: false });
+    return Object.freeze({ status: "unknown", resubmitAllowed: false });
   }
-  const receipt = requireRecord(durableReceipt, 'Value conversion durable receipt');
-  const status = requireString(receipt, 'status');
-  if (status === 'failed') return Object.freeze({ status, resubmitAllowed: false });
-  if (status !== 'succeeded') {
-    return Object.freeze({ status: 'unknown', resubmitAllowed: false });
+  const receipt = requireRecord(
+    durableReceipt,
+    "Value conversion durable receipt",
+  );
+  const status = requireString(receipt, "status");
+  if (status === "failed")
+    return Object.freeze({ status, resubmitAllowed: false });
+  if (status !== "succeeded") {
+    return Object.freeze({ status: "unknown", resubmitAllowed: false });
   }
-  const transactionIds = receipt['transactionIds'];
+  const transactionIds = receipt["transactionIds"];
   if (
     !Array.isArray(transactionIds) ||
     transactionIds.length === 0 ||
     !transactionIds.every((transactionId) =>
-      typeof transactionId === 'string' ? transactionId.trim().length > 0 : false,
+      typeof transactionId === "string"
+        ? transactionId.trim().length > 0
+        : false,
     )
   ) {
-    throw new Error('Successful value conversion receipt requires transaction identities');
+    throw new Error(
+      "Successful value conversion receipt requires transaction identities",
+    );
   }
   return Object.freeze({
     status,
@@ -263,23 +302,36 @@ export function resolveUnknownValueConversion(
 export function settleValueConversionExecution(
   input: ValueConversionExecutionInput,
 ): ValueConversionExecutionSettlement {
-  const record = requireRecord(input, 'Value conversion execution');
-  const sourceAmount = requirePositiveAmount(record, 'sourceAmountMinor');
-  const executedSource = requireNonNegativeAmount(record, 'executedSourceMinor');
-  const executedDestination = requireNonNegativeAmount(record, 'executedDestinationMinor');
+  const record = requireRecord(input, "Value conversion execution");
+  const sourceAmount = requirePositiveAmount(record, "sourceAmountMinor");
+  const executedSource = requireNonNegativeAmount(
+    record,
+    "executedSourceMinor",
+  );
+  const executedDestination = requireNonNegativeAmount(
+    record,
+    "executedDestinationMinor",
+  );
   if (executedSource > sourceAmount) {
-    throw new Error('Value conversion execution exceeds its quoted source amount');
+    throw new Error(
+      "Value conversion execution exceeds its quoted source amount",
+    );
   }
   const returnedSource = sourceAmount - executedSource;
-  const partialExecutionPolicy = requireString(record, 'partialExecutionPolicy');
-  if (returnedSource > 0n && partialExecutionPolicy === 'forbidden') {
-    throw new Error('Partial value conversion execution is forbidden by its pinned profile');
+  const partialExecutionPolicy = requireString(
+    record,
+    "partialExecutionPolicy",
+  );
+  if (returnedSource > 0n && partialExecutionPolicy === "forbidden") {
+    throw new Error(
+      "Partial value conversion execution is forbidden by its pinned profile",
+    );
   }
   if (
-    partialExecutionPolicy !== 'forbidden' &&
-    partialExecutionPolicy !== 'return_unexecuted_source'
+    partialExecutionPolicy !== "forbidden" &&
+    partialExecutionPolicy !== "return_unexecuted_source"
   ) {
-    throw new Error('Unknown value conversion partial-execution profile');
+    throw new Error("Unknown value conversion partial-execution profile");
   }
   return Object.freeze({
     executedSourceMinor: executedSource.toString(),
@@ -291,17 +343,26 @@ export function settleValueConversionExecution(
 export function planValueConversionCorrection(
   input: ValueConversionCorrectionInput,
 ): ValueConversionCorrection {
-  const inputRecord = requireRecord(input, 'Value conversion correction');
-  const original = requireRecord(inputRecord['original'], 'Original value conversion');
-  if (requireString(inputRecord, 'correctionKind') !== 'literal_reversal') {
-    throw new Error('Unknown value conversion correction kind');
+  const inputRecord = requireRecord(input, "Value conversion correction");
+  const original = requireRecord(
+    inputRecord["original"],
+    "Original value conversion",
+  );
+  if (requireString(inputRecord, "correctionKind") !== "literal_reversal") {
+    throw new Error("Unknown value conversion correction kind");
   }
   return Object.freeze({
-    correctionKind: 'literal_reversal',
-    sourceAsset: requireString(original, 'sourceAsset'),
-    sourceAmountMinor: requirePositiveAmount(original, 'sourceAmountMinor').toString(),
-    destinationAsset: requireString(original, 'destinationAsset'),
-    destinationAmountMinor: requirePositiveAmount(original, 'destinationAmountMinor').toString(),
-    rateSnapshotId: requireString(original, 'rateSnapshotId'),
+    correctionKind: "literal_reversal",
+    sourceAsset: requireString(original, "sourceAsset"),
+    sourceAmountMinor: requirePositiveAmount(
+      original,
+      "sourceAmountMinor",
+    ).toString(),
+    destinationAsset: requireString(original, "destinationAsset"),
+    destinationAmountMinor: requirePositiveAmount(
+      original,
+      "destinationAmountMinor",
+    ).toString(),
+    rateSnapshotId: requireString(original, "rateSnapshotId"),
   });
 }
