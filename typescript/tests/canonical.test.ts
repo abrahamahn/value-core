@@ -1,15 +1,31 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { canonicalJson, domainSeparatedDigest } from '../src/canonical.js';
 
 describe('canonical evidence', () => {
-  it('matches the cross-language canonical JSON and digest golden vector', async () => {
-    const value = { z: [3, { b: true, a: 'x' }], '\u{e000}': 2, '😀': 1 };
+  it('matches every language-neutral canonical JSON and digest vector', async () => {
+    interface CanonicalVector {
+      readonly name: string;
+      readonly domain: string;
+      readonly contractVersion: string;
+      readonly value: unknown;
+      readonly canonical: string;
+      readonly digest: string;
+    }
+    const fixture = JSON.parse(
+      readFileSync(new URL('../../conformance/canonical-v1.json', import.meta.url), 'utf8'),
+    ) as { readonly profile: string; readonly vectors: readonly CanonicalVector[] };
 
-    expect(canonicalJson(value)).toBe('{"z":[3,{"a":"x","b":true}],"😀":1,"":2}');
-    await expect(domainSeparatedDigest('value-core/test', 'v1', value)).resolves.toBe(
-      'd422be436e96980b0c5d83b09c9e6049d4a1834c16e68fe874bf57b9b7b5de62',
-    );
+    expect(fixture.profile).toBe('value-core-canonical-v1');
+    for (const vector of fixture.vectors) {
+      expect(canonicalJson(vector.value), vector.name).toBe(vector.canonical);
+      await expect(
+        domainSeparatedDigest(vector.domain, vector.contractVersion, vector.value),
+        vector.name,
+      ).resolves.toBe(vector.digest);
+    }
   });
 
   it('rejects values that cannot have stable data semantics', () => {

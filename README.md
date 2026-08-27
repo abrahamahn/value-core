@@ -29,6 +29,7 @@ The supported public surface covers:
 - exact half-even rational rates with generic snapshots and freshness evaluation;
 - strict RFC 3339 calendar validation and canonical UTC formatting in both APIs;
 - canonical JSON and domain-separated SHA-256 evidence.
+- one versioned canonicalization corpus executed by both TypeScript and Rust.
 
 ## What this library is not
 

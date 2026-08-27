@@ -1,0 +1,42 @@
+{
+  "profile": "value-core-canonical-v1",
+  "vectors": [
+    {
+      "name": "unicode-order",
+      "domain": "value-core/test",
+      "contractVersion": "v1",
+      "value": {
+        "z": [3, { "b": true, "a": "x" }],
+        "": 2,
+        "😀": 1
+      },
+      "canonical": "{\"z\":[3,{\"a\":\"x\",\"b\":true}],\"😀\":1,\"\":2}",
+      "digest": "d422be436e96980b0c5d83b09c9e6049d4a1834c16e68fe874bf57b9b7b5de62"
+    },
+    {
+      "name": "number-boundaries",
+      "domain": "value-core/canonical",
+      "contractVersion": "v1",
+      "value": {
+        "smallFixed": 0.000001,
+        "smallExponent": 1e-7,
+        "largeFixed": 100000000000000000000,
+        "largeExponent": 1e21,
+        "decimal": 1.25
+      },
+      "canonical": "{\"decimal\":1.25,\"largeExponent\":1e+21,\"largeFixed\":100000000000000000000,\"smallExponent\":1e-7,\"smallFixed\":0.000001}",
+      "digest": "7fbdfdcb38b338c27545d32460b0163365e502f23b79a5ce61dfc4c27f309f14"
+    },
+    {
+      "name": "escaped-nested",
+      "domain": "value-core/evidence",
+      "contractVersion": "2026-01",
+      "value": {
+        "message": "line\nquote\"slash\\",
+        "array": [null, false, { "é": "composed", "é": "decomposed" }]
+      },
+      "canonical": "{\"array\":[null,false,{\"é\":\"decomposed\",\"é\":\"composed\"}],\"message\":\"line\\nquote\\\"slash\\\\\"}",
+      "digest": "4dcb58fa7fb9cf03d2a1e0e976f8745bf63bb89331c3e00b3e11d636c445570c"
+    }
+  ]
+}

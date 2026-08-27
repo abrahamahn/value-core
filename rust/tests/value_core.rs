@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
-use serde_json::json;
+use serde::Deserialize;
+use serde_json::{Value, json};
 use value_core::account::{AccountHistoryPosting, fold_account_history};
 use value_core::amount::{
     ArithmeticOperation, evaluate_value_arithmetic, multiply_rational_floor, parse_amount_minor,
@@ -420,13 +421,38 @@ fn conversion_and_statement_facts_remain_balanced_and_continuous() {
 
 #[test]
 fn canonical_evidence_matches_the_cross_language_golden_vector() {
-    let value = json!({"z": [3, {"b": true, "a": "x"}], "": 2, "😀": 1});
-    assert_eq!(
-        canonical_json(&value).unwrap(),
-        "{\"z\":[3,{\"a\":\"x\",\"b\":true}],\"😀\":1,\"\":2}"
-    );
-    assert_eq!(
-        domain_separated_digest("value-core/test", "v1", &value).unwrap(),
-        "d422be436e96980b0c5d83b09c9e6049d4a1834c16e68fe874bf57b9b7b5de62"
-    );
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CanonicalVector {
+        name: String,
+        domain: String,
+        contract_version: String,
+        value: Value,
+        canonical: String,
+        digest: String,
+    }
+    #[derive(Deserialize)]
+    struct CanonicalFixture {
+        profile: String,
+        vectors: Vec<CanonicalVector>,
+    }
+
+    let fixture: CanonicalFixture =
+        serde_json::from_str(include_str!("../../conformance/canonical-v1.json")).unwrap();
+    assert_eq!(fixture.profile, "value-core-canonical-v1");
+    for vector in fixture.vectors {
+        assert_eq!(
+            canonical_json(&vector.value).unwrap(),
+            vector.canonical,
+            "{} canonical JSON",
+            vector.name
+        );
+        assert_eq!(
+            domain_separated_digest(&vector.domain, &vector.contract_version, &vector.value)
+                .unwrap(),
+            vector.digest,
+            "{} digest",
+            vector.name
+        );
+    }
 }
