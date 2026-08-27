@@ -29,6 +29,19 @@ describe('value rates and time', () => {
         maxStalenessSeconds: 60,
       }).expiresAt,
     ).toBe('2026-01-01T00:01:02.000Z');
+    expect(() =>
+      createValueRateSnapshot({
+        snapshotId: 'rate-out-of-range',
+        baseAsset: 'credits',
+        quoteAsset: 'points',
+        numerator: '1',
+        denominator: '1',
+        observedAt: '2026-01-01T00:00:00.000Z',
+        recordedAt: '2026-01-01T00:00:00.000Z',
+        effectiveAt: '2026-01-01T00:00:00.000Z',
+        maxStalenessSeconds: Number.MAX_SAFE_INTEGER,
+      }),
+    ).toThrow(/range/i);
   });
 
   it('evaluates refresh boundaries exactly', () => {

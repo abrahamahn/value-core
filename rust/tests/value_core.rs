@@ -247,6 +247,20 @@ fn rates_round_and_expire_deterministically() {
     })
     .unwrap();
     assert_eq!(snapshot.expires_at, "2026-01-01T00:01:02.000Z");
+    assert!(
+        create_value_rate_snapshot(ValueRateSnapshotInput {
+            snapshot_id: "rate-out-of-range".into(),
+            base_asset: "credits".into(),
+            quote_asset: "points".into(),
+            numerator: "1".into(),
+            denominator: "1".into(),
+            observed_at: "2026-01-01T00:00:00.000Z".into(),
+            recorded_at: "2026-01-01T00:00:00.000Z".into(),
+            effective_at: "2026-01-01T00:00:00.000Z".into(),
+            max_staleness_seconds: 9_007_199_254_740_991,
+        })
+        .is_err()
+    );
     assert!(matches!(
         evaluate_value_rate_freshness(
             "rate-1",

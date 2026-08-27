@@ -2,6 +2,8 @@ use crate::amount::parse_amount_minor;
 use crate::time::{format_rfc3339_millis, parse_rfc3339_millis};
 use crate::{ValueError, ValueResult, required};
 
+const MAX_RFC3339_MILLIS: i64 = 8_640_000_000_000_000;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RationalRateResult {
     pub amount_minor: String,
@@ -116,6 +118,11 @@ pub fn create_value_rate_snapshot(input: ValueRateSnapshotInput) -> ValueResult<
         .checked_mul(1_000)
         .and_then(|staleness| effective.checked_add(staleness))
         .ok_or_else(|| ValueError::new("Value rate expiry time is outside the supported range"))?;
+    if !(-MAX_RFC3339_MILLIS..=MAX_RFC3339_MILLIS).contains(&expires) {
+        return Err(ValueError::new(
+            "Value rate expiry time is outside the supported RFC 3339 calendar range",
+        ));
+    }
     Ok(ValueRateSnapshot {
         snapshot_id: input.snapshot_id,
         base_asset: input.base_asset,
