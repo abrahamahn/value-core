@@ -87,6 +87,13 @@ pnpm test
 
 ## Rust example
 
+Install the crate directly from the repository (pin a tag or revision in production):
+
+```toml
+[dependencies]
+value-core = { git = "https://github.com/abrahamahn/value-core.git" }
+```
+
 ```rust
 use value_core::transaction::{
     AccountBalance, CanonicalPosting, apply_balanced_transaction,

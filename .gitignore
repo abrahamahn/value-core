@@ -7,3 +7,5 @@ typescript/coverage/
 typescript/*.tgz
 rust/target/
 rust/*.crate
+/target/
+/*.crate
