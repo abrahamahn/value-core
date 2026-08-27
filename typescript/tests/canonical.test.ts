@@ -15,7 +15,7 @@ describe('canonical evidence', () => {
       readonly digest: string;
     }
     const fixture = JSON.parse(
-      readFileSync(new URL('../../conformance/canonical-v1.json', import.meta.url), 'utf8'),
+      readFileSync(new URL('../../rust/fixtures/canonical-v1.json', import.meta.url), 'utf8'),
     ) as { readonly profile: string; readonly vectors: readonly CanonicalVector[] };
 
     expect(fixture.profile).toBe('value-core-canonical-v1');

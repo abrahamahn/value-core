@@ -1,0 +1,63 @@
+{
+  "profile": "value-core-rules-v1",
+  "rationalFloor": [
+    {
+      "amountMinor": "-3",
+      "numerator": "1",
+      "denominator": "2",
+      "expectedAmountMinor": "-2",
+      "remainderNumerator": "1"
+    },
+    {
+      "amountMinor": "5",
+      "numerator": "2",
+      "denominator": "3",
+      "expectedAmountMinor": "3",
+      "remainderNumerator": "1"
+    },
+    {
+      "amountMinor": "7",
+      "numerator": "-2",
+      "denominator": "3",
+      "expectedAmountMinor": "-5",
+      "remainderNumerator": "1"
+    },
+    {
+      "amountMinor": "9223372036854775807",
+      "numerator": "1",
+      "denominator": "1",
+      "expectedAmountMinor": "9223372036854775807",
+      "remainderNumerator": "0"
+    }
+  ],
+  "halfEven": [
+    { "amountMinor": "1", "numerator": "1", "denominator": "2", "expected": "0" },
+    { "amountMinor": "3", "numerator": "1", "denominator": "2", "expected": "2" },
+    { "amountMinor": "5", "numerator": "1", "denominator": "2", "expected": "2" },
+    { "amountMinor": "7", "numerator": "1", "denominator": "2", "expected": "4" },
+    { "amountMinor": "10", "numerator": "2", "denominator": "3", "expected": "7" }
+  ],
+  "transaction": {
+    "balances": [
+      { "accountId": "buyer", "asset": "credits", "balanceMinor": "100" },
+      { "accountId": "seller", "asset": "credits", "balanceMinor": "5" },
+      { "accountId": "platform-fee", "asset": "credits", "balanceMinor": "0" }
+    ],
+    "postings": [
+      { "accountId": "buyer", "asset": "credits", "amountMinor": "-30" },
+      { "accountId": "seller", "asset": "credits", "amountMinor": "28" },
+      { "accountId": "platform-fee", "asset": "credits", "amountMinor": "2" }
+    ],
+    "expectedBalances": [
+      { "accountId": "buyer", "asset": "credits", "balanceMinor": "70" },
+      { "accountId": "seller", "asset": "credits", "balanceMinor": "33" },
+      { "accountId": "platform-fee", "asset": "credits", "balanceMinor": "2" }
+    ],
+    "reversal": [
+      { "accountId": "buyer", "asset": "credits", "amountMinor": "30" },
+      { "accountId": "seller", "asset": "credits", "amountMinor": "-28" },
+      { "accountId": "platform-fee", "asset": "credits", "amountMinor": "-2" }
+    ],
+    "digest": "713cc11847e84e270f7435d245d8bd44b930df3927d4e740052696f560e939d5"
+  }
+}

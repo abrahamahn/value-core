@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Replace the handwritten Rust SHA-256 implementation with the audited `sha2` crate.
+- Execute canonical JSON, exact arithmetic, transaction, reversal, and posting-manifest vectors in
+  both TypeScript and Rust.
+- Package shared conformance fixtures inside the Rust crate and verify the packaged crate in CI.
+
 ## 0.3.0
 
 - Add caller-configurable semantic command payload projection without embedding application field

@@ -438,7 +438,7 @@ fn canonical_evidence_matches_the_cross_language_golden_vector() {
     }
 
     let fixture: CanonicalFixture =
-        serde_json::from_str(include_str!("../../conformance/canonical-v1.json")).unwrap();
+        serde_json::from_str(include_str!("../fixtures/canonical-v1.json")).unwrap();
     assert_eq!(fixture.profile, "value-core-canonical-v1");
     for vector in fixture.vectors {
         assert_eq!(
@@ -455,4 +455,142 @@ fn canonical_evidence_matches_the_cross_language_golden_vector() {
             vector.name
         );
     }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RationalFloorVector {
+    amount_minor: String,
+    numerator: String,
+    denominator: String,
+    expected_amount_minor: String,
+    remainder_numerator: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HalfEvenVector {
+    amount_minor: String,
+    numerator: String,
+    denominator: String,
+    expected: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BalanceVector {
+    account_id: String,
+    asset: String,
+    balance_minor: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PostingVector {
+    account_id: String,
+    asset: String,
+    amount_minor: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TransactionVector {
+    balances: Vec<BalanceVector>,
+    postings: Vec<PostingVector>,
+    expected_balances: Vec<BalanceVector>,
+    reversal: Vec<PostingVector>,
+    digest: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ValueRulesFixture {
+    profile: String,
+    rational_floor: Vec<RationalFloorVector>,
+    half_even: Vec<HalfEvenVector>,
+    transaction: TransactionVector,
+}
+
+fn value_rules_fixture() -> ValueRulesFixture {
+    serde_json::from_str(include_str!("../fixtures/value-rules-v1.json")).unwrap()
+}
+
+fn account_balance(vector: BalanceVector) -> AccountBalance {
+    AccountBalance {
+        account_id: vector.account_id,
+        asset: vector.asset,
+        balance_minor: vector.balance_minor,
+        allow_negative: false,
+    }
+}
+
+fn canonical_posting(vector: PostingVector) -> CanonicalPosting {
+    CanonicalPosting {
+        account_id: vector.account_id,
+        asset: vector.asset,
+        amount_minor: vector.amount_minor,
+    }
+}
+
+#[test]
+fn exact_arithmetic_matches_the_cross_language_conformance_corpus() {
+    let fixture = value_rules_fixture();
+    assert_eq!(fixture.profile, "value-core-rules-v1");
+    for vector in fixture.rational_floor {
+        let actual =
+            multiply_rational_floor(&vector.amount_minor, &vector.numerator, &vector.denominator)
+                .unwrap();
+        assert_eq!(actual.amount_minor, vector.expected_amount_minor);
+        assert_eq!(actual.remainder_numerator, vector.remainder_numerator);
+    }
+    for vector in fixture.half_even {
+        assert_eq!(
+            multiply_rational_half_even(
+                &vector.amount_minor,
+                &vector.numerator,
+                &vector.denominator,
+            )
+            .unwrap()
+            .amount_minor,
+            vector.expected
+        );
+    }
+}
+
+#[test]
+fn transaction_rules_match_the_cross_language_conformance_corpus() {
+    let transaction = value_rules_fixture().transaction;
+    let balances = transaction
+        .balances
+        .into_iter()
+        .map(account_balance)
+        .collect::<Vec<_>>();
+    let postings = transaction
+        .postings
+        .into_iter()
+        .map(canonical_posting)
+        .collect::<Vec<_>>();
+    let expected_balances = transaction
+        .expected_balances
+        .into_iter()
+        .map(account_balance)
+        .collect::<Vec<_>>();
+    let expected_reversal = transaction
+        .reversal
+        .into_iter()
+        .map(canonical_posting)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        apply_balanced_transaction(&balances, &postings).unwrap(),
+        expected_balances
+    );
+    assert_eq!(
+        create_transaction_reversal(&postings).unwrap(),
+        expected_reversal
+    );
+    assert_eq!(
+        create_posting_manifest_digest(&postings).unwrap(),
+        transaction.digest
+    );
 }
