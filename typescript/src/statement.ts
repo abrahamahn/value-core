@@ -1,4 +1,5 @@
 import { parseAmountMinor } from "./amount.js";
+import { requireIdentity } from "./validation.js";
 
 export const MAX_STATEMENT_PAGE_SIZE = 500;
 
@@ -36,10 +37,6 @@ export interface ValueStatementPage {
   readonly nextCursor?: ValueStatementCursor;
 }
 
-function requireIdentity(value: string, field: string): void {
-  if (value.trim().length === 0) throw new Error(`${field} is required`);
-}
-
 function parseSequence(value: string, allowZero: boolean): bigint {
   const sequence = parseAmountMinor(value);
   if (allowZero ? sequence < 0n : sequence <= 0n) {
@@ -53,6 +50,66 @@ function requireTimestamp(value: string, field: string): void {
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== value) {
     throw new Error(`${field} must be a canonical timestamp`);
   }
+}
+
+function validateStatementPosting(
+  posting: ValueStatementPostingFact,
+  accountId: string,
+  asset: string,
+  expectedSequence: bigint,
+  runningBalance: bigint,
+  postingIds: Set<string>,
+  accountSequences: Set<string>,
+): { readonly accountSequence: bigint; readonly balanceAfter: bigint } {
+  requireIdentity(posting.postingId, "Value statement posting");
+  requireIdentity(posting.transactionId, "Value statement transaction");
+  requireIdentity(
+    posting.sourceNamespace,
+    "Value statement source namespace",
+  );
+  requireIdentity(posting.sourceType, "Value statement source type");
+  requireIdentity(posting.sourceId, "Value statement source");
+  requireTimestamp(posting.occurredAt, "Value statement occurrence time");
+  requireTimestamp(posting.recordedAt, "Value statement record time");
+  if (posting.accountId !== accountId) {
+    throw new Error("Value statement contains a foreign account");
+  }
+  if (posting.asset !== asset) {
+    throw new Error("Value statement contains a cross-asset posting");
+  }
+  if (
+    !Number.isSafeInteger(posting.postingSequence) ||
+    posting.postingSequence < 1
+  ) {
+    throw new Error("Value statement posting sequence is invalid");
+  }
+  const accountSequence = parseSequence(posting.accountSequence, false);
+  if (
+    postingIds.has(posting.postingId) ||
+    accountSequences.has(posting.accountSequence)
+  ) {
+    throw new Error(
+      "Value statement contains a duplicate posting identity or sequence",
+    );
+  }
+  postingIds.add(posting.postingId);
+  accountSequences.add(posting.accountSequence);
+  if (accountSequence !== expectedSequence) {
+    throw new Error("Value statement account sequence is not gap-free");
+  }
+
+  const amount = parseAmountMinor(posting.amountMinor);
+  if (amount === 0n)
+    throw new Error("Value statement posting must be non-zero");
+  const balanceBefore = parseAmountMinor(posting.balanceBeforeMinor);
+  const balanceAfter = parseAmountMinor(posting.balanceAfterMinor);
+  if (balanceBefore !== runningBalance) {
+    throw new Error("Value statement balance-before continuity mismatch");
+  }
+  if (balanceAfter !== balanceBefore + amount) {
+    throw new Error("Value statement balance-after continuity mismatch");
+  }
+  return { accountSequence, balanceAfter };
 }
 
 export function buildValueStatementPage(input: {
@@ -91,60 +148,20 @@ export function buildValueStatementPage(input: {
   });
 
   for (const [index, posting] of ordered.entries()) {
-    requireIdentity(posting.postingId, "Value statement posting");
-    requireIdentity(posting.transactionId, "Value statement transaction");
-    requireIdentity(
-      posting.sourceNamespace,
-      "Value statement source namespace",
+    const validated = validateStatementPosting(
+      posting,
+      input.accountId,
+      input.asset,
+      expectedSequence,
+      runningBalance,
+      postingIds,
+      accountSequences,
     );
-    requireIdentity(posting.sourceType, "Value statement source type");
-    requireIdentity(posting.sourceId, "Value statement source");
-    requireTimestamp(posting.occurredAt, "Value statement occurrence time");
-    requireTimestamp(posting.recordedAt, "Value statement record time");
-    if (posting.accountId !== input.accountId) {
-      throw new Error("Value statement contains a foreign account");
-    }
-    if (posting.asset !== input.asset) {
-      throw new Error("Value statement contains a cross-asset posting");
-    }
-    if (
-      !Number.isSafeInteger(posting.postingSequence) ||
-      posting.postingSequence < 1
-    ) {
-      throw new Error("Value statement posting sequence is invalid");
-    }
-    const accountSequence = parseSequence(posting.accountSequence, false);
-    if (
-      postingIds.has(posting.postingId) ||
-      accountSequences.has(posting.accountSequence)
-    ) {
-      throw new Error(
-        "Value statement contains a duplicate posting identity or sequence",
-      );
-    }
-    postingIds.add(posting.postingId);
-    accountSequences.add(posting.accountSequence);
-    if (accountSequence !== expectedSequence) {
-      throw new Error("Value statement account sequence is not gap-free");
-    }
-
-    const amount = parseAmountMinor(posting.amountMinor);
-    if (amount === 0n)
-      throw new Error("Value statement posting must be non-zero");
-    const balanceBefore = parseAmountMinor(posting.balanceBeforeMinor);
-    const balanceAfter = parseAmountMinor(posting.balanceAfterMinor);
-    if (balanceBefore !== runningBalance) {
-      throw new Error("Value statement balance-before continuity mismatch");
-    }
-    if (balanceAfter !== balanceBefore + amount) {
-      throw new Error("Value statement balance-after continuity mismatch");
-    }
-
-    runningBalance = balanceAfter;
+    runningBalance = validated.balanceAfter;
     expectedSequence += 1n;
     if (index < input.limit) {
-      pageClosingSequence = accountSequence;
-      pageClosingBalance = balanceAfter;
+      pageClosingSequence = validated.accountSequence;
+      pageClosingBalance = validated.balanceAfter;
     }
   }
 

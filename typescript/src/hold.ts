@@ -3,6 +3,7 @@ import {
   validateBalancedTransaction,
   type CanonicalPostingInput,
 } from "./transaction.js";
+import { requireIdentity } from "./validation.js";
 
 export type HoldState = "open" | "released" | "settled";
 
@@ -19,10 +20,6 @@ export interface HoldSettlement {
   readonly settledAmountMinor: string;
   readonly releasedAmountMinor: string;
   readonly postings: readonly CanonicalPostingInput[];
-}
-
-function requireIdentity(value: string, field: string): void {
-  if (value.trim().length === 0) throw new Error(`${field} is required`);
 }
 
 function validateHold(hold: ValueHold): bigint {

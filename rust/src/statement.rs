@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::amount::parse_amount_minor;
 use crate::time::{format_rfc3339_millis, parse_rfc3339_millis, try_format_rfc3339_millis};
-use crate::{ValueError, ValueResult, required};
+use crate::{MAX_SAFE_INTEGER_U64, ValueError, ValueResult, required};
 
 pub const MAX_STATEMENT_PAGE_SIZE: usize = 500;
 
@@ -64,9 +64,102 @@ pub struct StatementPage {
     pub has_more: bool,
     pub next_cursor: Option<StatementCursor>,
 }
+
+fn validate_canonical_statement_timestamp(timestamp: &str, field: &str) -> ValueResult<()> {
+    let parsed = parse_rfc3339_millis(timestamp, field)
+        .map_err(|_| ValueError::new(format!("{field} must be a canonical timestamp")))?;
+    let canonical = try_format_rfc3339_millis(parsed, field)
+        .map_err(|_| ValueError::new(format!("{field} must be a canonical timestamp")))?;
+    if canonical != timestamp {
+        return Err(ValueError::new(format!(
+            "{field} must be a canonical timestamp"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_statement_posting(
+    posting: &StatementPosting,
+    account_id: &str,
+    asset: &str,
+    expected_sequence: i128,
+    balance: i64,
+    posting_ids: &mut BTreeSet<String>,
+    sequences: &mut BTreeSet<String>,
+) -> ValueResult<i64> {
+    required(&posting.posting_id, "Value statement posting is required")?;
+    required(
+        &posting.transaction_id,
+        "Value statement transaction is required",
+    )?;
+    required(
+        &posting.source_namespace,
+        "Value statement source namespace is required",
+    )?;
+    required(
+        &posting.source_type,
+        "Value statement source type is required",
+    )?;
+    required(&posting.source_id, "Value statement source is required")?;
+    validate_canonical_statement_timestamp(
+        &posting.occurred_at,
+        "Value statement occurrence time",
+    )?;
+    validate_canonical_statement_timestamp(&posting.recorded_at, "Value statement record time")?;
+    if posting.account_id != account_id {
+        return Err(ValueError::new(
+            "Value statement contains a foreign account",
+        ));
+    }
+    if posting.asset != asset {
+        return Err(ValueError::new(
+            "Value statement contains a cross-asset posting",
+        ));
+    }
+    if posting.posting_sequence == 0 || posting.posting_sequence > MAX_SAFE_INTEGER_U64 {
+        return Err(ValueError::new(
+            "Value statement posting sequence is invalid",
+        ));
+    }
+    let account_sequence = parse_amount_minor(&posting.account_sequence)?;
+    if account_sequence <= 0 {
+        return Err(ValueError::new(
+            "Value statement account sequence is invalid",
+        ));
+    }
+    if !posting_ids.insert(posting.posting_id.clone())
+        || !sequences.insert(posting.account_sequence.clone())
+    {
+        return Err(ValueError::new(
+            "Value statement contains a duplicate posting identity or sequence",
+        ));
+    }
+    if i128::from(account_sequence) != expected_sequence {
+        return Err(ValueError::new(
+            "Value statement account sequence is not gap-free",
+        ));
+    }
+    let amount_minor = parse_amount_minor(&posting.amount_minor)?;
+    if amount_minor == 0 {
+        return Err(ValueError::new("Value statement posting must be non-zero"));
+    }
+    let balance_before_minor = parse_amount_minor(&posting.balance_before_minor)?;
+    let balance_after_minor = parse_amount_minor(&posting.balance_after_minor)?;
+    if balance_before_minor != balance {
+        return Err(ValueError::new(
+            "Value statement balance-before continuity mismatch",
+        ));
+    }
+    if i128::from(balance_after_minor) != i128::from(balance) + i128::from(amount_minor) {
+        return Err(ValueError::new(
+            "Value statement balance-after continuity mismatch",
+        ));
+    }
+    Ok(balance_after_minor)
+}
+
 /// # Errors
 /// Returns `ValueError` when input violates an authority invariant.
-#[allow(clippy::too_many_lines)]
 pub fn build_value_statement_page(
     account_id: &str,
     asset: &str,
@@ -86,92 +179,24 @@ pub fn build_value_statement_page(
             "Value statement account sequence is invalid",
         ));
     }
+    let opening_balance = parse_amount_minor(opening_balance_minor)?;
     let mut ordered = postings.to_vec();
     ordered
         .sort_by_key(|posting| parse_amount_minor(&posting.account_sequence).unwrap_or(i64::MIN));
     let mut expected = i128::from(previous_sequence) + 1;
-    let mut balance = parse_amount_minor(opening_balance_minor)?;
+    let mut balance = opening_balance;
     let mut posting_ids = BTreeSet::new();
     let mut sequences = BTreeSet::new();
     for posting in &ordered {
-        required(&posting.posting_id, "Value statement posting is required")?;
-        required(
-            &posting.transaction_id,
-            "Value statement transaction is required",
+        balance = validate_statement_posting(
+            posting,
+            account_id,
+            asset,
+            expected,
+            balance,
+            &mut posting_ids,
+            &mut sequences,
         )?;
-        required(
-            &posting.source_namespace,
-            "Value statement source namespace is required",
-        )?;
-        required(
-            &posting.source_type,
-            "Value statement source type is required",
-        )?;
-        required(&posting.source_id, "Value statement source is required")?;
-        for (timestamp, field) in [
-            (&posting.occurred_at, "Value statement occurrence time"),
-            (&posting.recorded_at, "Value statement record time"),
-        ] {
-            let parsed = parse_rfc3339_millis(timestamp, field)
-                .map_err(|_| ValueError::new(format!("{field} must be a canonical timestamp")))?;
-            let canonical = try_format_rfc3339_millis(parsed, field)
-                .map_err(|_| ValueError::new(format!("{field} must be a canonical timestamp")))?;
-            if canonical != *timestamp {
-                return Err(ValueError::new(format!(
-                    "{field} must be a canonical timestamp"
-                )));
-            }
-        }
-        if posting.account_id != account_id {
-            return Err(ValueError::new(
-                "Value statement contains a foreign account",
-            ));
-        }
-        if posting.asset != asset {
-            return Err(ValueError::new(
-                "Value statement contains a cross-asset posting",
-            ));
-        }
-        if posting.posting_sequence == 0 || posting.posting_sequence > 9_007_199_254_740_991 {
-            return Err(ValueError::new(
-                "Value statement posting sequence is invalid",
-            ));
-        }
-        let account_sequence = parse_amount_minor(&posting.account_sequence)?;
-        if account_sequence <= 0 {
-            return Err(ValueError::new(
-                "Value statement account sequence is invalid",
-            ));
-        }
-        if !posting_ids.insert(posting.posting_id.clone())
-            || !sequences.insert(posting.account_sequence.clone())
-        {
-            return Err(ValueError::new(
-                "Value statement contains a duplicate posting identity or sequence",
-            ));
-        }
-        if i128::from(account_sequence) != expected {
-            return Err(ValueError::new(
-                "Value statement account sequence is not gap-free",
-            ));
-        }
-        let amount_minor = parse_amount_minor(&posting.amount_minor)?;
-        if amount_minor == 0 {
-            return Err(ValueError::new("Value statement posting must be non-zero"));
-        }
-        let balance_before_minor = parse_amount_minor(&posting.balance_before_minor)?;
-        let balance_after_minor = parse_amount_minor(&posting.balance_after_minor)?;
-        if balance_before_minor != balance {
-            return Err(ValueError::new(
-                "Value statement balance-before continuity mismatch",
-            ));
-        }
-        if i128::from(balance_after_minor) != i128::from(balance) + i128::from(amount_minor) {
-            return Err(ValueError::new(
-                "Value statement balance-after continuity mismatch",
-            ));
-        }
-        balance = balance_after_minor;
         expected += 1;
     }
     let entries: Vec<_> = ordered.into_iter().take(limit).collect();
@@ -181,11 +206,7 @@ pub fn build_value_statement_page(
         |posting| posting.account_sequence.clone(),
     );
     let closing_balance = entries.last().map_or_else(
-        || {
-            parse_amount_minor(opening_balance_minor)
-                .unwrap_or_default()
-                .to_string()
-        },
+        || opening_balance.to_string(),
         |posting| posting.balance_after_minor.clone(),
     );
     let next_cursor = has_more
@@ -200,7 +221,7 @@ pub fn build_value_statement_page(
         account_id: account_id.to_owned(),
         asset: asset.to_owned(),
         previous_account_sequence: previous_sequence.to_string(),
-        opening_balance_minor: parse_amount_minor(opening_balance_minor)?.to_string(),
+        opening_balance_minor: opening_balance.to_string(),
         closing_account_sequence: closing_sequence,
         closing_balance_minor: closing_balance,
         entries,

@@ -1,4 +1,5 @@
 import { domainSeparatedDigest } from "./canonical.js";
+import { isPlainDataObject, requireIdentity } from "./validation.js";
 
 export interface ValueCommand<TPayload = unknown> {
   readonly commandId: string;
@@ -23,12 +24,7 @@ export function projectValueCommandPayload(
   if (value === null || typeof value !== "object") return value;
   if (ancestors.has(value))
     throw new Error("Value command payload cannot contain a cycle");
-  const prototype = Object.getPrototypeOf(value) as object | null;
-  if (
-    !Array.isArray(value) &&
-    prototype !== Object.prototype &&
-    prototype !== null
-  ) {
+  if (!Array.isArray(value) && !isPlainDataObject(value)) {
     throw new Error("Value command payload accepts only plain data objects");
   }
   const excluded =
@@ -41,7 +37,7 @@ export function projectValueCommandPayload(
       );
     }
     return Object.fromEntries(
-      Object.entries(value as Readonly<Record<string, unknown>>)
+      Object.entries(value)
         .filter(([key]) => !excluded.has(key))
         .map(([key, item]) => [
           key,
@@ -54,11 +50,8 @@ export function projectValueCommandPayload(
 }
 
 function validateCommand(command: ValueCommand): void {
-  if (command.commandId.trim().length === 0)
-    throw new Error("Value command identity is required");
-  if (command.contractVersion.trim().length === 0) {
-    throw new Error("Value command contract version is required");
-  }
+  requireIdentity(command.commandId, "Value command identity");
+  requireIdentity(command.contractVersion, "Value command contract version");
 }
 
 export function createValueCommandDigest(

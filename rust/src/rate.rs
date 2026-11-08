@@ -1,8 +1,6 @@
 use crate::amount::parse_amount_minor;
 use crate::time::{parse_rfc3339_millis, try_format_rfc3339_millis};
-use crate::{ValueError, ValueResult, required};
-
-const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
+use crate::{MAX_SAFE_INTEGER_I64, ValueError, ValueResult, required};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RationalRateResult {
@@ -100,7 +98,7 @@ pub fn create_value_rate_snapshot(input: ValueRateSnapshotInput) -> ValueResult<
             "Value rate numerator and denominator must be positive",
         ));
     }
-    if !(1..=MAX_SAFE_INTEGER).contains(&input.max_staleness_seconds) {
+    if !(1..=MAX_SAFE_INTEGER_I64).contains(&input.max_staleness_seconds) {
         return Err(ValueError::new(
             "Value rate maximum staleness must be a positive safe integer",
         ));
@@ -155,7 +153,7 @@ pub fn evaluate_value_rate_freshness(
     refresh_interval_seconds: i64,
 ) -> ValueResult<ValueRateFreshness> {
     required(snapshot_id, "Value rate snapshot identity is required")?;
-    if !(1..=MAX_SAFE_INTEGER).contains(&refresh_interval_seconds) {
+    if !(1..=MAX_SAFE_INTEGER_I64).contains(&refresh_interval_seconds) {
         return Err(ValueError::new(
             "Value rate refresh interval must be a positive safe integer",
         ));

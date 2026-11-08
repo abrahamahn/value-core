@@ -1,5 +1,6 @@
 import { parseAmountMinor } from "./amount.js";
 import { domainSeparatedDigest } from "./canonical.js";
+import { isLowerSha256 } from "./validation.js";
 
 export interface PostingManifestDigestProfile {
   readonly domain: string;
@@ -113,7 +114,7 @@ export async function validatePostingManifest(
     );
   }
   validateBalancedTransaction(input.postings);
-  if (input.digest === undefined || !/^[0-9a-f]{64}$/u.test(input.digest)) {
+  if (input.digest === undefined || !isLowerSha256(input.digest)) {
     throw new Error("Posting manifest requires a lowercase SHA-256 digest");
   }
   if (
@@ -132,18 +133,12 @@ export interface AccountBalance {
   readonly allowNegative?: boolean;
 }
 
-/**
- * Applies all posting deltas to a detached balance set. Validation completes before a result is
- * returned, so callers can persist the result atomically without observing partial mutation.
- */
-export function applyBalancedTransaction(input: {
-  readonly balances: readonly AccountBalance[];
-  readonly postings: readonly CanonicalPostingInput[];
-}): readonly AccountBalance[] {
-  validateBalancedTransaction(input.postings);
-  const balances = new Map<string, AccountBalance>();
-  for (const balance of input.balances) {
-    if (balances.has(balance.accountId))
+function indexAccountBalances(
+  balances: readonly AccountBalance[],
+): ReadonlyMap<string, AccountBalance> {
+  const indexed = new Map<string, AccountBalance>();
+  for (const balance of balances) {
+    if (indexed.has(balance.accountId))
       throw new Error("Account balance identity is duplicated");
     if (
       balance.accountId.trim().length === 0 ||
@@ -157,12 +152,18 @@ export function applyBalancedTransaction(input: {
         `Account ${balance.accountId} cannot start with negative value`,
       );
     }
-    balances.set(balance.accountId, balance);
+    indexed.set(balance.accountId, balance);
   }
+  return indexed;
+}
 
+function accumulatePostingDeltas(
+  indexed: ReadonlyMap<string, AccountBalance>,
+  postings: readonly CanonicalPostingInput[],
+): ReadonlyMap<string, bigint> {
   const deltas = new Map<string, bigint>();
-  for (const posting of input.postings) {
-    const balance = balances.get(posting.accountId);
+  for (const posting of postings) {
+    const balance = indexed.get(posting.accountId);
     if (balance === undefined)
       throw new Error(`Posting account ${posting.accountId} is unavailable`);
     if (balance.asset !== posting.asset)
@@ -173,6 +174,20 @@ export function applyBalancedTransaction(input: {
         parseAmountMinor(posting.amountMinor),
     );
   }
+  return deltas;
+}
+
+/**
+ * Applies all posting deltas to a detached balance set. Validation completes before a result is
+ * returned, so callers can persist the result atomically without observing partial mutation.
+ */
+export function applyBalancedTransaction(input: {
+  readonly balances: readonly AccountBalance[];
+  readonly postings: readonly CanonicalPostingInput[];
+}): readonly AccountBalance[] {
+  validateBalancedTransaction(input.postings);
+  const balances = indexAccountBalances(input.balances);
+  const deltas = accumulatePostingDeltas(balances, input.postings);
 
   return Object.freeze(
     input.balances.map((balance) => {

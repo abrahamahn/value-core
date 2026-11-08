@@ -3,7 +3,7 @@ use serde_json::to_value;
 
 use crate::amount::parse_amount_minor;
 use crate::canonical::domain_separated_digest;
-use crate::{ValueError, ValueResult, is_lower_sha256, nonempty};
+use crate::{MAX_SAFE_INTEGER_USIZE, ValueError, ValueResult, is_lower_sha256, nonempty};
 
 pub const DEFAULT_POSTING_MANIFEST_DOMAIN: &str = "value-core/posting-manifest";
 pub const DEFAULT_POSTING_MANIFEST_CONTRACT_VERSION: &str = "v1";
@@ -73,15 +73,9 @@ pub struct AccountBalance {
     pub allow_negative: bool,
 }
 
-/// Applies a balanced posting set to detached balances without partial mutation.
-///
-/// # Errors
-/// Returns [`ValueError`] when the transaction or any resulting balance is invalid.
-pub fn apply_balanced_transaction(
+fn index_account_balances(
     balances: &[AccountBalance],
-    postings: &[CanonicalPosting],
-) -> ValueResult<Vec<AccountBalance>> {
-    validate_balanced_transaction(postings)?;
+) -> ValueResult<std::collections::BTreeMap<&str, &AccountBalance>> {
     let mut indexed = std::collections::BTreeMap::new();
     for balance in balances {
         nonempty(
@@ -106,7 +100,14 @@ pub fn apply_balanced_transaction(
             return Err(ValueError::new("Account balance identity is duplicated"));
         }
     }
-    let mut deltas = std::collections::BTreeMap::<&str, i128>::new();
+    Ok(indexed)
+}
+
+fn accumulate_posting_deltas<'a>(
+    indexed: &std::collections::BTreeMap<&str, &AccountBalance>,
+    postings: &'a [CanonicalPosting],
+) -> ValueResult<std::collections::BTreeMap<&'a str, i128>> {
+    let mut deltas = std::collections::BTreeMap::<&'a str, i128>::new();
     for posting in postings {
         let balance = indexed.get(posting.account_id.as_str()).ok_or_else(|| {
             ValueError::new(format!(
@@ -123,6 +124,20 @@ pub fn apply_balanced_transaction(
             .checked_add(delta)
             .ok_or_else(|| ValueError::new("Value arithmetic overflow"))?;
     }
+    Ok(deltas)
+}
+
+/// Applies a balanced posting set to detached balances without partial mutation.
+///
+/// # Errors
+/// Returns [`ValueError`] when the transaction or any resulting balance is invalid.
+pub fn apply_balanced_transaction(
+    balances: &[AccountBalance],
+    postings: &[CanonicalPosting],
+) -> ValueResult<Vec<AccountBalance>> {
+    validate_balanced_transaction(postings)?;
+    let indexed = index_account_balances(balances)?;
+    let deltas = accumulate_posting_deltas(&indexed, postings)?;
     balances
         .iter()
         .map(|balance| {
@@ -174,8 +189,7 @@ pub fn create_transaction_reversal(
     validate_balanced_transaction(&reversal)?;
     Ok(reversal)
 }
-/// # Errors
-/// Returns `ValueError` when input violates an authority invariant.
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BalancedTransaction {
     pub total_minor: &'static str,
@@ -271,7 +285,7 @@ pub fn validate_posting_manifest_with_profile(
     digest: &str,
     profile: PostingManifestDigestProfile<'_>,
 ) -> ValueResult<PostingManifest> {
-    if !(2..=9_007_199_254_740_991).contains(&declared_count) {
+    if !(2..=MAX_SAFE_INTEGER_USIZE).contains(&declared_count) {
         return Err(ValueError::new(
             "Posting manifest must declare at least two postings",
         ));

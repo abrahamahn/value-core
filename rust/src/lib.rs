@@ -47,6 +47,10 @@ impl std::error::Error for ValueError {}
 
 pub type ValueResult<T> = Result<T, ValueError>;
 
+pub(crate) const MAX_SAFE_INTEGER_I64: i64 = 9_007_199_254_740_991;
+pub(crate) const MAX_SAFE_INTEGER_U64: u64 = 9_007_199_254_740_991;
+pub(crate) const MAX_SAFE_INTEGER_USIZE: usize = 9_007_199_254_740_991;
+
 pub(crate) fn required(value: &str, message: &str) -> ValueResult<()> {
     if value.trim().is_empty() {
         Err(ValueError::new(message))

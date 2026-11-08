@@ -1,4 +1,5 @@
 import { parseRfc3339Millis } from "./time.js";
+import { isLowerSha256, requireIdentity } from "./validation.js";
 
 export interface OrderedValueFact {
   readonly id: string;
@@ -11,8 +12,7 @@ export function orderValueFacts<TFact extends OrderedValueFact>(
   facts: readonly TFact[],
 ): readonly TFact[] {
   for (const fact of facts) {
-    if (fact.id.trim().length === 0)
-      throw new Error("Value fact identity is required");
+    requireIdentity(fact.id, "Value fact identity");
     if (!Number.isSafeInteger(fact.sequence) || fact.sequence <= 0) {
       throw new Error("Value fact sequence must be a positive safe integer");
     }
@@ -35,7 +35,7 @@ export function validatePinnedDigestReferences(input: {
   readonly requiredReferences: readonly string[];
   readonly references: Readonly<Record<string, string>>;
 }): { readonly digest: string; readonly consistent: true } {
-  if (!/^[0-9a-f]{64}$/u.test(input.digest)) {
+  if (!isLowerSha256(input.digest)) {
     throw new Error("Pinned value digest must be lowercase SHA-256");
   }
   const required = new Set<string>();

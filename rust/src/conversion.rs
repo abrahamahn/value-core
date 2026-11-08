@@ -158,8 +158,6 @@ pub fn resolve_value_conversion_quote_replay(
         quote: existing.clone(),
     })
 }
-/// # Errors
-/// Returns `ValueError` when input violates an authority invariant.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ValidConversionQuote {
     pub status: &'static str,

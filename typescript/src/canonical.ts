@@ -1,4 +1,6 @@
 /** Deterministic JSON and domain-separated SHA-256 evidence. */
+import { isPlainDataObject, requireIdentity } from "./validation.js";
+
 function compareCodeUnits(left: string, right: string): number {
   if (left < right) return -1;
   if (left > right) return 1;
@@ -30,12 +32,11 @@ function canonicalize(value: unknown, ancestors: WeakSet<object>): unknown {
     if (Array.isArray(value)) {
       return value.map((item) => canonicalize(item, ancestors));
     }
-    const prototype = Object.getPrototypeOf(value) as object | null;
-    if (prototype !== Object.prototype && prototype !== null) {
+    if (!isPlainDataObject(value)) {
       throw new Error("Canonical JSON accepts only plain data objects");
     }
     return Object.fromEntries(
-      Object.entries(value as Readonly<Record<string, unknown>>)
+      Object.entries(value)
         .sort(([left], [right]) => compareCodeUnits(left, right))
         .map(([key, item]) => [key, canonicalize(item, ancestors)]),
     );
@@ -59,11 +60,8 @@ export async function domainSeparatedDigest(
   contractVersion: string,
   value: unknown,
 ): Promise<string> {
-  if (domain.trim().length === 0)
-    throw new Error("Canonical digest domain is required");
-  if (contractVersion.trim().length === 0) {
-    throw new Error("Canonical digest contract version is required");
-  }
+  requireIdentity(domain, "Canonical digest domain");
+  requireIdentity(contractVersion, "Canonical digest contract version");
   const cryptoView: { readonly crypto?: { readonly subtle?: SubtleCrypto } } =
     globalThis;
   if (cryptoView.crypto?.subtle === undefined) {
